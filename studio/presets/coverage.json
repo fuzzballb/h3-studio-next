@@ -1,0 +1,53 @@
+{
+ "about": "Coverage plans: a scene laid out as shots. new = a new shot (a cut); otherwise the shot continues the one before in latent space, so the place, the light and the sound carry through. {a} and {b} are the first and second person of the scene, {place} its location. Lines are placeholders to replace.",
+ "plans": [
+  {"id": "arrive-talk", "name": "Arrive, sit, talk", "line": "A bridge into a conversation instead of a jump.",
+   "shots": [
+    {"title": "Arriving", "new": true, "framing": "wide", "camera": "lead", "action": "{a} and {b} walk into {place} side by side and look around.", "silent": true},
+    {"title": "Sitting down", "new": false, "action": "{a} and {b} sit down facing each other.", "silent": true},
+    {"title": "The conversation", "new": true, "framing": "two-close", "camera": "static", "action": "{a} and {b} sit facing each other and talk.", "lines": 3},
+    {"title": "The conversation goes on", "new": false, "action": "{a} leans forward a little.", "lines": 2}
+   ]},
+  {"id": "master-singles", "name": "Master and two singles", "line": "A wide, then each face.",
+   "shots": [
+    {"title": "Master", "new": true, "framing": "wide", "camera": "static", "action": "{a} and {b} stand in {place} and talk.", "lines": 2},
+    {"title": "Single on the first", "new": true, "framing": "single-close", "camera": "static", "action": "{a} listens and then answers.", "lines": 1},
+    {"title": "Single on the second", "new": true, "framing": "single-close", "camera": "static", "action": "{b} reacts and answers.", "lines": 1}
+   ]},
+  {"id": "walk-talk", "name": "Walk and talk", "line": "Two people, one moving camera in front of them.",
+   "shots": [
+    {"title": "Walk and talk", "new": true, "framing": "medium", "camera": "lead", "action": "{a} walks on the left and {b} on the right, side by side through {place}, talking.", "lines": 3},
+    {"title": "Still walking", "new": false, "action": "{a} and {b} keep walking side by side.", "lines": 2},
+    {"title": "They stop", "new": false, "action": "{a} and {b} slow down and stop.", "lines": 1}
+   ]},
+  {"id": "chase", "name": "Chase", "line": "Start, running, the vehicle, away.",
+   "shots": [
+    {"title": "It starts", "new": true, "framing": "medium", "camera": "handheld", "action": "{a} and {b} look up, startled, and start to run.", "lines": 1},
+    {"title": "Running", "new": true, "framing": "medium", "camera": "lead", "action": "{a} runs on the left and {b} on the right at the same speed, side by side toward the camera; the street behind them is empty.", "silent": true},
+    {"title": "The car", "new": true, "framing": "wide", "camera": "static", "action": "{a} and {b} reach a car parked at the curb on the left of the picture. {b} opens the driver's door; {a} walks around the front of the car to the passenger door on the far side. Both get in and shut their doors.", "lines": 1},
+    {"title": "Driving", "new": true, "framing": "hood", "camera": "static", "action": "{b} drives, {a} sits in the passenger seat and looks back.", "lines": 2},
+    {"title": "Away", "new": true, "framing": "wide", "camera": "drone-rise", "action": "The car drives away down the empty road.", "silent": true}
+   ]},
+  {"id": "reveal", "name": "Reveal", "line": "Close first, then the place.",
+   "shots": [
+    {"title": "Detail", "new": true, "framing": "insert", "camera": "static", "action": "A hand of {a} rests on the object.", "silent": true},
+    {"title": "The face", "new": true, "framing": "single-close", "camera": "push-in", "action": "{a} looks up from the object, eyes widening a little.", "silent": true},
+    {"title": "The place", "new": true, "framing": "wide", "camera": "pull-back", "action": "{a} stands small in {place}.", "silent": true}
+   ]},
+  {"id": "product", "name": "Product spot", "line": "Hero, in use, pack shot.",
+   "shots": [
+    {"title": "Hero", "new": true, "framing": "insert", "camera": "push-in", "action": "The product stands on a clean surface as light sweeps across it.", "silent": true},
+    {"title": "In use", "new": true, "framing": "medium", "camera": "static", "action": "{a} picks up the product, uses it and smiles.", "lines": 1},
+    {"title": "Pack shot", "new": true, "framing": "insert", "camera": "orbit-right", "action": "The product alone, centred, turning slowly in the light.", "silent": true}
+   ]},
+  {"id": "music-video", "name": "Music video verse", "line": "Four short cuts for a verse.",
+   "shots": [
+    {"title": "Performance wide", "new": true, "framing": "full", "camera": "push-in", "action": "{a} performs to the camera in {place}.", "silent": true, "frames": 124},
+    {"title": "Performance close", "new": true, "framing": "single-close", "camera": "handheld", "action": "{a} sings with closed eyes, then looks into the lens.", "silent": true, "frames": 124},
+    {"title": "Cutaway", "new": true, "framing": "insert", "camera": "static", "action": "Hands on the instrument.", "silent": true, "frames": 73},
+    {"title": "The move", "new": true, "framing": "full", "camera": "orbit-left", "action": "{a} turns once as the light flares behind.", "silent": true, "frames": 124}
+   ]},
+  {"id": "single", "name": "One shot", "line": "A single new shot.",
+   "shots": [{"title": "Shot", "new": true, "framing": "medium", "camera": "static", "action": "", "silent": true}]}
+ ]
+}

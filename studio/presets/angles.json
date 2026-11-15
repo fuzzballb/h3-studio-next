@@ -1,0 +1,25 @@
+{
+ "about": "Angle sets for Edit a picture: each entry is one picture from one load of the model, with the subject of Picture 1 turned. Plain words, no LoRA needed. Check a set before you build on it: left and right can come out facing the same way.",
+ "views": [
+  {"id": "front", "name": "Front", "text": "seen straight from the front"},
+  {"id": "front-left", "name": "Front left", "text": "seen in three-quarter view from the front left"},
+  {"id": "left", "name": "Left side", "text": "seen in profile from the left side"},
+  {"id": "back-left", "name": "Back left", "text": "seen in three-quarter view from behind on the left"},
+  {"id": "back", "name": "Back", "text": "seen straight from behind"},
+  {"id": "back-right", "name": "Back right", "text": "seen in three-quarter view from behind on the right"},
+  {"id": "right", "name": "Right side", "text": "seen in profile from the right side"},
+  {"id": "front-right", "name": "Front right", "text": "seen in three-quarter view from the front right"},
+  {"id": "high", "name": "High angle", "text": "seen from a high angle, the camera above head height looking down"},
+  {"id": "low", "name": "Low angle", "text": "seen from a low angle near the ground looking up"},
+  {"id": "top", "name": "Top-down", "text": "seen from straight above"},
+  {"id": "close", "name": "Close-up", "text": "in a close-up that fills the frame"}
+ ],
+ "sets": [
+  {"id": "around", "name": "Five views around", "views": ["front", "front-left", "left", "back", "right"]},
+  {"id": "orbit", "name": "Full orbit", "views": ["front", "front-right", "right", "back-right", "back", "back-left", "left", "front-left"]},
+  {"id": "heights", "name": "Three heights", "views": ["front", "high", "low", "top"]},
+  {"id": "wide-close", "name": "Wide and close", "views": ["front", "close"]}
+ ],
+ "one": "The same subject as in Picture 1, exactly the same, {view}. The same place and the same light as in Picture 1.",
+ "sheet": "Create a character reference sheet on a plain light grey background, even studio lighting, photorealistic. The person from Picture 1, the same face, hair and clothes. Show the whole body from head to feet four times side by side: from the front, from the back, in three-quarter view and from the side. The same person and the same clothes in all four views."
+}

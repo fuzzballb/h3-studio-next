@@ -1,0 +1,43 @@
+{
+ "about": "Looks as words: a style line that opens every prompt of a film, plus optional lens and light phrases. All positive wording: H3 has no negative prompt. General looks only; no named films, shows, games or living artists.",
+ "styles": [
+  {"id": "cinematic", "name": "Cinematic realism", "text": "The video is in realistic photographic cinematic style: natural colours, soft contrast, shallow depth of field, fine film grain."},
+  {"id": "action", "name": "Action movie", "text": "The video is in realistic photographic cinematic action-movie style: punchy contrast, teal and amber grade, crisp detail, slight haze."},
+  {"id": "neon-night", "name": "Neon night", "text": "The video is in realistic photographic cinematic style, a gritty futuristic city look at night: wet surfaces, neon reflections, teal, magenta and amber light, slight haze."},
+  {"id": "golden-hour", "name": "Golden hour", "text": "The video is in realistic photographic cinematic style at golden hour: low warm sunlight, long soft shadows, glowing rim light on hair and shoulders."},
+  {"id": "noir", "name": "Film noir", "text": "The video is in black-and-white film noir style: hard single-source light, deep shadows, venetian-blind patterns, cigarette haze, fine grain."},
+  {"id": "documentary", "name": "Documentary", "text": "The video looks like an observational documentary: natural available light, handheld camera, true colours, real textures."},
+  {"id": "commercial", "name": "Commercial gloss", "text": "The video is in polished commercial style: clean bright studio lighting, glossy reflections, saturated product colours, crisp focus."},
+  {"id": "sitcom-90s", "name": "1990s sitcom", "text": "The video looks like a 1990s American multi-camera sitcom shot on 35mm film: warm even studio lighting, soft pastel set, gentle grain."},
+  {"id": "vhs", "name": "Home video tape", "text": "The video looks like a 1990s home video tape: soft low resolution, colour bleed, slight tracking noise, a date stamp glow, handheld."},
+  {"id": "super8", "name": "Super 8", "text": "The video looks like Super 8 film: warm faded colours, heavy grain, light leaks, slight gate weave."},
+  {"id": "music-video", "name": "Music video", "text": "The video is in bold music-video style: saturated coloured lights, haze, lens flares, strong backlight and silhouettes."},
+  {"id": "horror", "name": "Horror", "text": "The video is in realistic photographic horror style: cold desaturated colours, dim practical lights, deep black shadows, slow uneasy stillness."},
+  {"id": "western", "name": "Western", "text": "The video is in classic western style: harsh midday sun, dusty air, sun-bleached wood, wide open landscape, warm earthy grade."},
+  {"id": "storybook", "name": "Pastel storybook", "text": "The video is in a symmetrical pastel storybook style: centred compositions, flat frontal framing, soft candy colours, tidy miniature-like sets."},
+  {"id": "anime", "name": "Hand-drawn animation", "text": "The video is hand-drawn 2D cel animation: clean ink outlines, flat shaded colours, painted backgrounds, expressive poses."},
+  {"id": "clay", "name": "Stop-motion clay", "text": "The video is stop-motion clay animation: sculpted clay figures with visible fingerprints, miniature sets, slightly stepped movement."},
+  {"id": "fashion", "name": "Fashion film", "text": "The video is in high-fashion editorial style: clean seamless backdrop or runway, sculpted light, crisp fabric detail, confident poses."},
+  {"id": "ugc", "name": "Phone selfie video", "text": "The video looks like a casual vertical phone selfie video: natural indoor light, slight handheld movement, direct and unpolished."}
+ ],
+ "lenses": [
+  {"id": "24", "name": "24 mm wide", "text": "shot on a 24mm wide-angle lens, deep focus"},
+  {"id": "35", "name": "35 mm", "text": "shot on a 35mm lens at eye level"},
+  {"id": "50", "name": "50 mm", "text": "shot on a 50mm lens, natural perspective"},
+  {"id": "85", "name": "85 mm portrait", "text": "shot on an 85mm portrait lens, soft blurred background"},
+  {"id": "135", "name": "135 mm tele", "text": "shot on a 135mm telephoto lens, compressed background"},
+  {"id": "anamorphic", "name": "Anamorphic", "text": "shot on an anamorphic lens: oval bokeh, horizontal blue lens flares"},
+  {"id": "macro", "name": "Macro", "text": "shot on a macro lens, extreme close detail, razor-thin focus"},
+  {"id": "fisheye", "name": "Fisheye", "text": "shot on a fisheye lens with strong barrel distortion"}
+ ],
+ "lights": [
+  {"id": "daylight", "name": "Overcast daylight", "text": "Natural overcast daylight, soft and even"},
+  {"id": "window", "name": "Window light", "text": "Soft daylight from a large window on one side, gentle falloff"},
+  {"id": "practicals", "name": "Warm practicals", "text": "Warm practical lamps in the room, both faces clearly lit"},
+  {"id": "night-neon", "name": "Night, neon", "text": "Night, coloured neon signs as the light sources, both faces clearly lit"},
+  {"id": "moon", "name": "Moonlight", "text": "Cool blue moonlight with a soft warm lamp that keeps the faces clearly lit"},
+  {"id": "backlit", "name": "Backlit", "text": "Strong backlight with a rim on hair and shoulders, soft fill on the faces"},
+  {"id": "studio", "name": "Studio key", "text": "Clean three-point studio lighting"},
+  {"id": "fire", "name": "Firelight", "text": "Flickering warm firelight on the faces"}
+ ]
+}

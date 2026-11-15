@@ -1,0 +1,59 @@
+{
+ "about": "Camera moves as words. kind static/move lets the prompt check catch a locked camera and a move in one prompt. A preset with a lora names it by pattern: when a matching LoRA is installed the studio offers it and adds the trigger (never in a part with dialogue: H3 speaks trigger words).",
+ "framings": [
+  {"id": "two-close", "name": "Close two-shot", "text": "Close medium two-shot from the chest up, the camera is close so both faces are large in the frame"},
+  {"id": "single-close", "name": "Close-up", "text": "Close-up from the shoulders up, the face fills a large part of the frame"},
+  {"id": "medium", "name": "Medium shot", "text": "Medium shot from the waist up"},
+  {"id": "cowboy", "name": "Cowboy shot", "text": "Shot from the knees up"},
+  {"id": "full", "name": "Full shot", "text": "Full shot, the whole body from head to feet in frame with space around it"},
+  {"id": "wide", "name": "Wide shot", "text": "Wide shot that shows the whole place, the people small in the frame"},
+  {"id": "ots", "name": "Over the shoulder", "text": "Over-the-shoulder shot: the back of one person's shoulder and head in the foreground on the edge of the frame, the other person's face clearly visible"},
+  {"id": "low", "name": "Low angle", "text": "Low-angle shot from near the ground looking up"},
+  {"id": "high", "name": "High angle", "text": "High-angle shot looking down from above head height"},
+  {"id": "top", "name": "Top-down", "text": "Top-down shot from straight above"},
+  {"id": "pov", "name": "Point of view", "text": "First-person point-of-view shot, the hands of the person in the lower part of the frame"},
+  {"id": "insert", "name": "Insert", "text": "Close insert shot of the object, sharp, filling the frame"},
+  {"id": "hood", "name": "Car, through the windshield", "text": "Seen from outside through the windshield by a camera on the hood, the windshield glass clean and clear"}
+ ],
+ "moves": [
+  {"id": "static", "group": "Still", "kind": "static", "name": "Locked-off", "text": "Static shot on a locked, still camera"},
+  {"id": "handheld", "group": "Still", "kind": "static", "name": "Handheld, in place", "text": "Handheld camera that stays in place with a slight natural shake"},
+
+  {"id": "push-in", "group": "Dolly", "kind": "move", "name": "Slow push-in", "text": "The camera pushes in slowly and steadily toward the subject"},
+  {"id": "pull-back", "group": "Dolly", "kind": "move", "name": "Pull-back reveal", "text": "The camera pulls back slowly and steadily, revealing more of the place"},
+  {"id": "truck-left", "group": "Dolly", "kind": "move", "name": "Truck left", "text": "The camera moves sideways to the left at a steady pace, parallel to the subject"},
+  {"id": "truck-right", "group": "Dolly", "kind": "move", "name": "Truck right", "text": "The camera moves sideways to the right at a steady pace, parallel to the subject"},
+  {"id": "dolly-zoom", "group": "Dolly", "kind": "move", "name": "Dolly zoom", "text": "Dolly zoom: the camera moves back while the lens zooms in, the subject stays the same size while the background stretches away"},
+
+  {"id": "pan-left", "group": "Pan and tilt", "kind": "move", "name": "Pan left", "text": "The camera pans slowly to the left from a fixed position"},
+  {"id": "pan-right", "group": "Pan and tilt", "kind": "move", "name": "Pan right", "text": "The camera pans slowly to the right from a fixed position"},
+  {"id": "tilt-up", "group": "Pan and tilt", "kind": "move", "name": "Tilt up", "text": "The camera tilts up slowly from a fixed position"},
+  {"id": "tilt-down", "group": "Pan and tilt", "kind": "move", "name": "Tilt down", "text": "The camera tilts down slowly from a fixed position"},
+  {"id": "whip-pan", "group": "Pan and tilt", "kind": "move", "name": "Whip pan", "text": "The camera whip-pans fast to the side with motion blur and settles on the new subject"},
+
+  {"id": "follow-behind", "group": "Tracking", "kind": "move", "name": "Follow from behind", "text": "Steadicam tracking shot that follows the subject from behind at walking speed"},
+  {"id": "lead", "group": "Tracking", "kind": "move", "name": "Lead from the front", "text": "The camera moves backward in front of the subject at the subject's speed, so the face stays large and clearly visible"},
+  {"id": "side-track", "group": "Tracking", "kind": "move", "name": "Side tracking", "text": "Tracking shot that moves alongside the subject at the same speed"},
+  {"id": "chase", "group": "Tracking", "kind": "move", "name": "Vehicle chase", "text": "Fast tracking shot moving alongside the vehicle at its speed, low to the road"},
+
+  {"id": "crane-up", "group": "Crane and drone", "kind": "move", "name": "Crane up", "text": "Crane shot that rises smoothly from eye level to high above the scene"},
+  {"id": "crane-down", "group": "Crane and drone", "kind": "move", "name": "Crane down", "text": "A slow aerial crane shot descending from above the rooftops down to street level, ending in a wide shot"},
+  {"id": "drone-rise", "group": "Crane and drone", "kind": "move", "name": "Drone rise", "text": "Drone shot that rises and pulls away, the subject getting smaller in a wide landscape"},
+  {"id": "drone-fly", "group": "Crane and drone", "kind": "move", "name": "Drone fly-over", "text": "Smooth drone shot flying forward over the scene at a steady height"},
+  {"id": "fpv", "group": "Crane and drone", "kind": "move", "name": "FPV fly-through", "text": "Fast first-person drone shot that dives and flies through the scene close to the ground"},
+
+  {"id": "orbit-left", "group": "Orbit", "kind": "move", "name": "Orbit left", "text": "The camera orbits slowly around the subject to the left, the subject stays in the centre of the frame"},
+  {"id": "orbit-right", "group": "Orbit", "kind": "move", "name": "Orbit right", "text": "The camera orbits slowly around the subject to the right, the subject stays in the centre of the frame"},
+  {"id": "orbit-180", "group": "Orbit", "kind": "move", "name": "Half orbit", "text": "The camera performs one smooth 180-degree orbit around the subject, from the front around to the back"},
+  {"id": "bullet-time", "group": "Orbit", "kind": "move", "name": "Bullet time", "text": "At the peak of the action time slows almost completely: everything stays frozen in mid-air while the camera performs a smooth 180-degree orbital movement around it, every position and spatial relationship kept; then time snaps back to normal speed",
+   "lora": {"pattern": "bullet.?time", "trigger": "bullet-time", "strength": 0.8},
+   "note": "Works best written as timed phases: 0.00-3.00s the run-up, 3.00-7.00s bullet-time with the orbit, 7.00-10.00s back to normal speed."},
+
+  {"id": "zoom-in", "group": "Zoom", "kind": "move", "name": "Slow zoom in", "text": "The lens zooms in slowly on the subject, the camera position stays fixed"},
+  {"id": "zoom-out", "group": "Zoom", "kind": "move", "name": "Slow zoom out", "text": "The lens zooms out slowly, the camera position stays fixed"},
+  {"id": "crash-zoom", "group": "Zoom", "kind": "move", "name": "Crash zoom", "text": "Crash zoom: the lens snaps in fast on the subject's face"},
+  {"id": "rack-focus", "group": "Zoom", "kind": "static", "name": "Rack focus", "text": "The focus shifts from the foreground to the subject in the background, the camera stays still"}
+ ],
+ "motion_lora": {"pattern": "camera_motion", "trigger": "camera motion,", "strength": 0.6,
+  "note": "A camera-motion LoRA makes named moves happen more reliably. With two more LoRAs keep the strengths around 1.2-1.3 in total: three at full strength on the 8-step turbo made moving objects ghost."}
+}

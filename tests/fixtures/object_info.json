@@ -1,0 +1,3250 @@
+{
+"BasicGuider": {
+"category": "model/sampling/guiders",
+"display_name": "Basic Guider",
+"input": {
+"required": {
+"conditioning": [
+"CONDITIONING",
+{}
+],
+"model": [
+"MODEL",
+{}
+]
+}
+},
+"name": "BasicGuider",
+"output": [
+"GUIDER"
+],
+"output_name": [
+"GUIDER"
+]
+},
+"BasicScheduler": {
+"category": "model/sampling/schedulers",
+"display_name": null,
+"input": {
+"required": {
+"denoise": [
+"FLOAT",
+{
+"default": 1.0,
+"max": 1.0,
+"min": 0.0,
+"step": 0.01
+}
+],
+"model": [
+"MODEL",
+{}
+],
+"scheduler": [
+"COMBO",
+{
+"multiselect": false,
+"options": [
+"simple",
+"sgm_uniform",
+"karras",
+"exponential",
+"ddim_uniform",
+"beta",
+"normal",
+"linear_quadratic",
+"kl_optimal",
+"bong_tangent",
+"beta57",
+"FlowMatchEulerDiscreteScheduler"
+]
+}
+],
+"steps": [
+"INT",
+{
+"default": 20,
+"max": 10000,
+"min": 1
+}
+]
+}
+},
+"name": "BasicScheduler",
+"output": [
+"SIGMAS"
+],
+"output_name": [
+"SIGMAS"
+]
+},
+"CLIPLoader": {
+"category": "model/loaders",
+"display_name": "Load CLIP",
+"input": {
+"optional": {
+"device": [
+[
+"default",
+"cpu"
+],
+{
+"advanced": true
+}
+]
+},
+"required": {
+"clip_name": [
+[
+"qwen3vl_32b_minimax_h3_int8_convrot.safetensors",
+"qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+"qwen3vl_4b_abliterated_krea2.safetensors",
+"qwen3vl_4b_fp8_scaled.safetensors",
+"qwen3vl_8b_fp8_scaled.safetensors",
+"qwen3vl_8b_int8_convrot.safetensors",
+"qwen_2.5_vl_7b_fp8_scaled.safetensors",
+"qwen_3_4b.safetensors",
+"qwen_3_8b_fp8mixed.safetensors"
+]
+],
+"type": [
+[
+"stable_diffusion",
+"stable_cascade",
+"sd3",
+"stable_audio",
+"mochi",
+"ltxv",
+"pixart",
+"cosmos",
+"lumina2",
+"wan",
+"hidream",
+"chroma",
+"ace",
+"omnigen2",
+"qwen_image",
+"hunyuan_image",
+"flux2",
+"ovis",
+"longcat_image",
+"cogvideox",
+"lens",
+"pixeldit",
+"ideogram4",
+"boogu",
+"krea2",
+"joyimage",
+"mage",
+"minimax",
+"yue2",
+"flux3",
+"moss_image"
+]
+]
+}
+},
+"name": "CLIPLoader",
+"output": [
+"CLIP"
+],
+"output_name": [
+"CLIP"
+]
+},
+"ChatterBoxEngineNode": {
+"category": "TTS Audio Suite/\u2699\ufe0f Engines",
+"display_name": "\u2699\ufe0f ChatterBox TTS Engine",
+"input": {
+"required": {
+"cfg_weight": [
+"FLOAT",
+{
+"default": 0.5,
+"max": 1.0,
+"min": 0.0,
+"step": 0.05
+}
+],
+"crash_protection_template": [
+"STRING",
+{
+"default": "hmm ,, {seg} hmm ,,"
+}
+],
+"device": [
+[
+"auto",
+"cuda",
+"xpu",
+"cpu",
+"mps"
+],
+{
+"default": "auto"
+}
+],
+"exaggeration": [
+"FLOAT",
+{
+"default": 0.5,
+"max": 2.0,
+"min": 0.25,
+"step": 0.05
+}
+],
+"language": [
+[
+"local:English",
+"English",
+"German",
+"German (SebastianBodza)",
+"German (havok2)",
+"Norwegian",
+"French",
+"Russian",
+"Armenian",
+"Georgian",
+"Japanese",
+"Korean",
+"Italian"
+],
+{
+"default": "English"
+}
+],
+"temperature": [
+"FLOAT",
+{
+"default": 0.8,
+"max": 5.0,
+"min": 0.05,
+"step": 0.05
+}
+]
+}
+},
+"name": "ChatterBoxEngineNode",
+"output": [
+"TTS_ENGINE"
+],
+"output_name": [
+"TTS_engine"
+]
+},
+"ComfyMathExpression": {
+"category": "utilities",
+"display_name": "Math Expression",
+"input": {
+"required": {
+"expression": [
+"STRING",
+{
+"default": "a + b",
+"multiline": true
+}
+],
+"values": [
+"COMFY_AUTOGROW_V3",
+{
+"template": {
+"input": {
+"required": {
+"value": [
+"FLOAT,INT,BOOLEAN",
+{}
+]
+}
+},
+"min": 1,
+"names": [
+"a",
+"b",
+"c",
+"d",
+"e",
+"f",
+"g",
+"h",
+"i",
+"j",
+"k",
+"l",
+"m",
+"n",
+"o",
+"p",
+"q",
+"r",
+"s",
+"t",
+"u",
+"v",
+"w",
+"x",
+"y",
+"z"
+]
+}
+}
+]
+}
+},
+"name": "ComfyMathExpression",
+"output": [
+"FLOAT",
+"INT",
+"BOOLEAN"
+],
+"output_name": [
+"FLOAT",
+"INT",
+"BOOL"
+]
+},
+"EmptyLatentImage": {
+"category": "model/latent",
+"display_name": "Empty Latent Image",
+"input": {
+"required": {
+"batch_size": [
+"INT",
+{
+"default": 1,
+"max": 4096,
+"min": 1
+}
+],
+"height": [
+"INT",
+{
+"default": 1024,
+"max": 16384,
+"min": 16,
+"step": 8
+}
+],
+"width": [
+"INT",
+{
+"default": 1024,
+"max": 16384,
+"min": 16,
+"step": 8
+}
+]
+}
+},
+"name": "EmptyLatentImage",
+"output": [
+"LATENT"
+],
+"output_name": [
+"LATENT"
+]
+},
+"FrameInterpolate": {
+"category": "video",
+"display_name": "Run Frame Interpolation Model",
+"input": {
+"required": {
+"images": [
+"IMAGE",
+{}
+],
+"interp_model": [
+"INTERP_MODEL",
+{}
+],
+"multiplier": [
+"INT",
+{
+"default": 2,
+"max": 16,
+"min": 2
+}
+]
+}
+},
+"name": "FrameInterpolate",
+"output": [
+"IMAGE"
+],
+"output_name": [
+"IMAGE"
+]
+},
+"FrameInterpolationModelLoader": {
+"category": "model/loaders",
+"display_name": "Load Frame Interpolation Model",
+"input": {
+"required": {
+"model_name": [
+"COMBO",
+{
+"multiselect": false,
+"options": [
+"film_net_fp16.safetensors"
+]
+}
+]
+}
+},
+"name": "FrameInterpolationModelLoader",
+"output": [
+"INTERP_MODEL"
+],
+"output_name": [
+"INTERP_MODEL"
+]
+},
+"H3AdaLNLoRAFix": {
+"category": "PlagueKind/model_patches/minimax",
+"display_name": "H3 AdaLN LoRA Fix",
+"input": {
+"required": {
+"mode": [
+"COMBO",
+{
+"default": "port",
+"multiselect": false,
+"options": [
+"port",
+"strip",
+"off"
+]
+}
+],
+"model": [
+"MODEL",
+{}
+]
+}
+},
+"name": "H3AdaLNLoRAFix",
+"output": [
+"MODEL"
+],
+"output_name": [
+"MODEL"
+]
+},
+"H3LongVideoAppend": {
+"category": "video/long",
+"display_name": "Long Video: Append Part",
+"input": {
+"required": {
+"audio": [
+"AUDIO",
+{}
+],
+"crf": [
+"INT",
+{
+"default": 14,
+"max": 51,
+"min": 0
+}
+],
+"images": [
+"IMAGE",
+{}
+],
+"latent": [
+"LATENT",
+{}
+],
+"part": [
+"INT",
+{
+"default": 1,
+"max": 999,
+"min": 1
+}
+],
+"project": [
+"STRING",
+{
+"default": "my_long_video"
+}
+],
+"trim_frames": [
+"INT",
+{
+"default": 0,
+"forceInput": true,
+"max": 9999,
+"min": 0
+}
+]
+}
+},
+"name": "H3LongVideoAppend",
+"output": [
+"STRING"
+],
+"output_name": [
+"full_video_path"
+]
+},
+"H3LongVideoContinue": {
+"category": "video/long",
+"display_name": "Long Video: Continue From Previous Part",
+"input": {
+"optional": {
+"keep_latent_mask": [
+"BOOLEAN",
+{
+"default": false
+}
+],
+"new_shot": [
+"BOOLEAN",
+{
+"default": false
+}
+]
+},
+"required": {
+"audio_feather_ticks": [
+"INT",
+{
+"default": 8,
+"max": 256,
+"min": 0
+}
+],
+"context_length": [
+"INT",
+{
+"default": 39,
+"max": 9999,
+"min": 5
+}
+],
+"latent": [
+"LATENT",
+{}
+],
+"part": [
+"INT",
+{
+"default": 1,
+"max": 999,
+"min": 1
+}
+],
+"project": [
+"STRING",
+{
+"default": "my_long_video"
+}
+]
+}
+},
+"name": "H3LongVideoContinue",
+"output": [
+"LATENT",
+"INT"
+],
+"output_name": [
+"latent",
+"trim_frames"
+]
+},
+"H3LongVideoFaceCrop": {
+"category": "video/long",
+"display_name": "Long Video: Face Crop (track)",
+"input": {
+"required": {
+"box_scale": [
+"FLOAT",
+{
+"default": 2.6,
+"max": 5.0,
+"min": 1.5,
+"step": 0.1
+}
+],
+"confidence": [
+"FLOAT",
+{
+"default": 0.6,
+"max": 0.99,
+"min": 0.1,
+"step": 0.05
+}
+],
+"crop_size": [
+"INT",
+{
+"default": 512,
+"max": 1024,
+"min": 128,
+"step": 32
+}
+],
+"match": [
+"FLOAT",
+{
+"default": 0.35,
+"max": 1.0,
+"min": 0.0,
+"step": 0.05
+}
+],
+"max_face": [
+"INT",
+{
+"default": 140,
+"max": 4000,
+"min": 16
+}
+],
+"min_face": [
+"INT",
+{
+"default": 30,
+"max": 1000,
+"min": 8
+}
+],
+"part": [
+"INT",
+{
+"default": 1,
+"max": 999,
+"min": 1
+}
+],
+"project": [
+"STRING",
+{
+"default": "my_long_video"
+}
+],
+"reference": [
+"IMAGE",
+{}
+]
+}
+},
+"name": "H3LongVideoFaceCrop",
+"output": [
+"IMAGE",
+"INT",
+"BOOLEAN"
+],
+"output_name": [
+"crops",
+"frames",
+"has_work"
+]
+},
+"H3LongVideoFacePaste": {
+"category": "video/long",
+"display_name": "Long Video: Face Paste",
+"input": {
+"required": {
+"color_match": [
+"BOOLEAN",
+{
+"default": true
+}
+],
+"crf": [
+"INT",
+{
+"default": 14,
+"max": 51,
+"min": 0
+}
+],
+"feather": [
+"FLOAT",
+{
+"default": 0.35,
+"max": 1.0,
+"min": 0.0,
+"step": 0.05
+}
+],
+"images": [
+"IMAGE",
+{}
+],
+"mask_size": [
+"FLOAT",
+{
+"default": 0.75,
+"max": 1.5,
+"min": 0.3,
+"step": 0.05
+}
+],
+"part": [
+"INT",
+{
+"default": 1,
+"max": 999,
+"min": 1
+}
+],
+"project": [
+"STRING",
+{
+"default": "my_long_video"
+}
+]
+}
+},
+"name": "H3LongVideoFacePaste",
+"output": [
+"STRING"
+],
+"output_name": [
+"full_video_path"
+]
+},
+"H3LongVideoLoadConditioning": {
+"category": "video/long",
+"display_name": "Long Video: Load Part Conditioning",
+"input": {
+"required": {
+"part": [
+"INT",
+{
+"default": 1,
+"max": 999,
+"min": 1
+}
+],
+"project": [
+"STRING",
+{
+"default": "my_long_video"
+}
+]
+}
+},
+"name": "H3LongVideoLoadConditioning",
+"output": [
+"CONDITIONING"
+],
+"output_name": [
+"CONDITIONING"
+]
+},
+"H3LongVideoLoadPart": {
+"category": "video/long",
+"display_name": "Long Video: Load Part Latent",
+"input": {
+"required": {
+"part": [
+"INT",
+{
+"default": 1,
+"max": 999,
+"min": 1
+}
+],
+"project": [
+"STRING",
+{
+"default": "my_long_video"
+}
+]
+}
+},
+"name": "H3LongVideoLoadPart",
+"output": [
+"LATENT",
+"INT",
+"INT",
+"INT",
+"INT"
+],
+"output_name": [
+"latent",
+"context_frames",
+"frames",
+"width",
+"height"
+]
+},
+"H3LongVideoReferenceAudios": {
+"category": "video/long",
+"display_name": "Long Video: Reference Audios (voices)",
+"input": {
+"optional": {
+"audio_1": [
+"AUDIO"
+],
+"audio_2": [
+"AUDIO"
+],
+"audio_3": [
+"AUDIO"
+],
+"audio_4": [
+"AUDIO"
+]
+},
+"required": {
+"max_seconds": [
+"FLOAT",
+{
+"default": 10.0,
+"max": 30.0,
+"min": 1.0,
+"step": 0.5
+}
+]
+}
+},
+"name": "H3LongVideoReferenceAudios",
+"output": [
+"H3_REFS"
+],
+"output_name": [
+"references"
+]
+},
+"H3LongVideoSaveConditioning": {
+"category": "video/long",
+"display_name": "Long Video: Save Part Conditioning",
+"input": {
+"required": {
+"conditioning": [
+"CONDITIONING"
+],
+"part": [
+"INT",
+{
+"default": 1,
+"max": 999,
+"min": 1
+}
+],
+"project": [
+"STRING",
+{
+"default": "my_long_video"
+}
+]
+}
+},
+"name": "H3LongVideoSaveConditioning",
+"output": [],
+"output_name": []
+},
+"H3LongVideoUpscaleAppend": {
+"category": "video/long",
+"display_name": "Long Video: Append Upscaled Part",
+"input": {
+"optional": {
+"cut_threshold": [
+"FLOAT",
+{
+"default": 30.0,
+"max": 255.0,
+"min": 0.0,
+"step": 1.0
+}
+]
+},
+"required": {
+"context_frames": [
+"INT",
+{
+"default": 0,
+"forceInput": true,
+"max": 9999,
+"min": 0
+}
+],
+"crf": [
+"INT",
+{
+"default": 14,
+"max": 51,
+"min": 0
+}
+],
+"crop_height": [
+"INT",
+{
+"default": 0,
+"max": 16384,
+"min": 0
+}
+],
+"crop_width": [
+"INT",
+{
+"default": 0,
+"max": 16384,
+"min": 0
+}
+],
+"fps_multiplier": [
+"INT",
+{
+"default": 2,
+"max": 8,
+"min": 1
+}
+],
+"images": [
+"IMAGE",
+{}
+],
+"part": [
+"INT",
+{
+"default": 1,
+"max": 999,
+"min": 1
+}
+],
+"project": [
+"STRING",
+{
+"default": "my_long_video"
+}
+],
+"source_frames": [
+"INT",
+{
+"default": 0,
+"forceInput": true,
+"max": 99999,
+"min": 0
+}
+]
+}
+},
+"name": "H3LongVideoUpscaleAppend",
+"output": [
+"STRING"
+],
+"output_name": [
+"full_video_path"
+]
+},
+"H3SLAAttention": {
+"category": "PlagueKind/model_patches/minimax",
+"display_name": "H3 SLA Attention",
+"input": {
+"optional": {
+"dense_backend": [
+"COMBO",
+{
+"default": "comfy_kitchen",
+"multiselect": false,
+"options": [
+"pytorch",
+"comfy_kitchen",
+"sage:auto",
+"sage:qk_int8_pv_fp16_cuda",
+"sage:qk_int8_pv_fp16_triton",
+"sage:qk_int8_pv_fp8_cuda",
+"sage:qk_int8_pv_fp8_cuda++",
+"auto"
+]
+}
+],
+"dense_last_steps": [
+"INT",
+{
+"default": 0,
+"max": 8,
+"min": 0
+}
+],
+"dense_steps": [
+"STRING",
+{
+"default": "1",
+"multiline": false
+}
+],
+"disable_fp16_accum": [
+"BOOLEAN",
+{
+"default": true,
+"label_off": "follow --fast",
+"label_on": "disabled (recommended)"
+}
+],
+"enabled": [
+"BOOLEAN",
+{
+"default": true,
+"label_off": "dense (bypass)",
+"label_on": "sparse"
+}
+],
+"engine": [
+"COMBO",
+{
+"default": "comfy_kitchen",
+"multiselect": false,
+"options": [
+"triton",
+"comfy_kitchen"
+]
+}
+],
+"min_seq_len": [
+"INT",
+{
+"default": 12228,
+"max": 1000000,
+"min": 0,
+"step": 1024
+}
+],
+"protect_audio": [
+"BOOLEAN",
+{
+"default": false,
+"label_off": "uniform (turbo parity)",
+"label_on": "protect"
+}
+],
+"reference_protection": [
+"COMBO",
+{
+"default": "Off",
+"display_name": "Protect Vid/Ref",
+"multiselect": false,
+"options": [
+"Heavy Enforcement",
+"Light",
+"Off"
+]
+}
+],
+"stabilize_motion": [
+"BOOLEAN",
+{
+"default": false,
+"label_off": "off",
+"label_on": "on"
+}
+],
+"tail_correction": [
+"BOOLEAN",
+{
+"default": false,
+"label_off": "off",
+"label_on": "on (experimental)"
+}
+],
+"use_int8_qk": [
+"BOOLEAN",
+{
+"default": true,
+"label_off": "off",
+"label_on": "on (experimental)"
+}
+]
+},
+"required": {
+"block_size": [
+"COMBO",
+{
+"default": "32",
+"multiselect": false,
+"options": [
+"32",
+"64",
+"128"
+]
+}
+],
+"model": [
+"MODEL",
+{}
+],
+"sparsity_ratio": [
+"FLOAT",
+{
+"default": 0.8,
+"max": 0.95,
+"min": 0.0,
+"round": false,
+"step": 0.05
+}
+]
+}
+},
+"name": "H3SLAAttention",
+"output": [
+"MODEL"
+],
+"output_name": [
+"MODEL"
+]
+},
+"H3V2VGranularFractionalDenoise": {
+"category": "conditioning/minimax",
+"display_name": "H3 V2V Granular Fractional Denoise",
+"input": {
+"optional": {
+"source_mask": [
+"MASK",
+{}
+]
+},
+"required": {
+"audio_strength": [
+"FLOAT",
+{
+"default": 0.0,
+"max": 1.0,
+"min": 0.0
+}
+],
+"audio_vae": [
+"VAE",
+{}
+],
+"crop": [
+[
+"disabled",
+"center"
+],
+{
+"default": "center"
+}
+],
+"global_strength": [
+"FLOAT",
+{
+"default": 0.9995,
+"max": 1.0,
+"min": 0.0
+}
+],
+"inside_strength": [
+"FLOAT",
+{
+"default": 1.0,
+"max": 1.0,
+"min": 0.0
+}
+],
+"invert_mask": [
+"BOOLEAN",
+{
+"default": false
+}
+],
+"latent": [
+"LATENT",
+{}
+],
+"mask_temporal_reduce": [
+[
+"max",
+"mean",
+"min"
+],
+{
+"default": "max"
+}
+],
+"mode": [
+[
+"global",
+"spatial"
+],
+{
+"default": "global"
+}
+],
+"model": [
+"MODEL",
+{}
+],
+"outside_strength": [
+"FLOAT",
+{
+"default": 0.0,
+"max": 1.0,
+"min": 0.0
+}
+],
+"source_audio": [
+"AUDIO",
+{}
+],
+"source_fit": [
+[
+"start",
+"center",
+"end"
+],
+{
+"default": "start"
+}
+],
+"source_fps": [
+"FLOAT",
+{
+"default": 24.0,
+"max": 24.0,
+"min": 24.0
+}
+],
+"source_frames": [
+"IMAGE",
+{}
+],
+"vae": [
+"VAE",
+{}
+]
+}
+},
+"name": "H3V2VGranularFractionalDenoise",
+"output": [
+"LATENT",
+"MODEL",
+"STRING"
+],
+"output_name": [
+"latent",
+"model",
+"diagnostics"
+]
+},
+"ImageScale": {
+"category": "image/upscaling",
+"display_name": "Upscale Image",
+"input": {
+"required": {
+"crop": [
+[
+"disabled",
+"center"
+],
+{}
+],
+"height": [
+"INT",
+{
+"default": 512,
+"max": 16384,
+"min": 0
+}
+],
+"image": [
+"IMAGE",
+{}
+],
+"upscale_method": [
+[
+"nearest-exact",
+"bilinear",
+"area",
+"bicubic",
+"lanczos"
+],
+{}
+],
+"width": [
+"INT",
+{
+"default": 512,
+"max": 16384,
+"min": 0
+}
+]
+}
+},
+"name": "ImageScale",
+"output": [
+"IMAGE"
+],
+"output_name": [
+"IMAGE"
+]
+},
+"ImageSharpenKJ": {
+"category": "KJNodes/image",
+"display_name": "Image Sharpen KJ",
+"input": {
+"required": {
+"image": [
+"COMFY_MATCHTYPE_V3",
+{
+"template": {
+"allowed_types": "IMAGE,MASK",
+"template_id": "img_or_mask"
+}
+}
+],
+"method": [
+"COMFY_DYNAMICCOMBO_V3",
+{
+"options": [
+{
+"inputs": {
+"required": {
+"strength": [
+"FLOAT",
+{
+"default": 0.8,
+"max": 1.0,
+"min": 0.0,
+"step": 0.01,
+"tooltip": "0 = no sharpening, 1 = full RCAS sharpening."
+}
+]
+}
+},
+"key": "rcas"
+},
+{
+"inputs": {
+"required": {
+"radius": [
+"FLOAT",
+{
+"default": 1.0,
+"max": 5.0,
+"min": 0.5,
+"step": 0.1,
+"tooltip": "Gaussian blur sigma for the unsharp mask. Larger = enhances coarser detail."
+}
+],
+"strength": [
+"FLOAT",
+{
+"default": 0.5,
+"max": 3.0,
+"min": 0.0,
+"step": 0.01,
+"tooltip": "Sharpening multiplier. Values above 1.0 give aggressive sharpening."
+}
+],
+"threshold": [
+"FLOAT",
+{
+"default": 0.05,
+"max": 1.0,
+"min": 0.0,
+"step": 0.01,
+"tooltip": "Noise gate. Higher = only sharpen areas with more texture/detail. 0 = sharpen everything."
+}
+]
+}
+},
+"key": "adaptive_usm"
+},
+{
+"inputs": {
+"required": {
+"radius": [
+"FLOAT",
+{
+"default": 1.0,
+"max": 5.0,
+"min": 0.5,
+"step": 0.1,
+"tooltip": "Gaussian blur sigma defining the frequency cutoff. Larger = enhances coarser detail."
+}
+],
+"strength": [
+"FLOAT",
+{
+"default": 0.5,
+"max": 3.0,
+"min": 0.0,
+"step": 0.01,
+"tooltip": "Blend factor for high-frequency detail. Values above 1.0 give a punchier effect."
+}
+]
+}
+},
+"key": "high_pass"
+},
+{
+"inputs": {
+"required": {
+"iterations": [
+"INT",
+{
+"default": 10,
+"max": 100,
+"min": 1,
+"step": 1,
+"tooltip": "Richardson-Lucy iterations. More = sharper but slower, diminishing returns past ~20."
+}
+],
+"radius": [
+"FLOAT",
+{
+"default": 1.0,
+"max": 5.0,
+"min": 0.5,
+"step": 0.1,
+"tooltip": "Sigma of the assumed Gaussian blur to reverse."
+}
+],
+"strength": [
+"FLOAT",
+{
+"default": 0.5,
+"max": 1.0,
+"min": 0.0,
+"step": 0.01,
+"tooltip": "Blend between original (0) and fully deconvolved (1)."
+}
+]
+}
+},
+"key": "deconvolution"
+}
+]
+}
+]
+}
+},
+"name": "ImageSharpenKJ",
+"output": [
+"COMFY_MATCHTYPE_V3"
+],
+"output_name": [
+"output"
+]
+},
+"KSampler": {
+"category": "model/sampling",
+"display_name": "KSampler",
+"input": {
+"required": {
+"cfg": [
+"FLOAT",
+{
+"default": 8.0,
+"max": 100.0,
+"min": 0.0,
+"round": 0.01,
+"step": 0.1
+}
+],
+"denoise": [
+"FLOAT",
+{
+"default": 1.0,
+"max": 1.0,
+"min": 0.0,
+"step": 0.01
+}
+],
+"latent_image": [
+"LATENT",
+{}
+],
+"model": [
+"MODEL",
+{}
+],
+"negative": [
+"CONDITIONING",
+{}
+],
+"positive": [
+"CONDITIONING",
+{}
+],
+"sampler_name": [
+[
+"euler",
+"euler_cfg_pp",
+"euler_ancestral",
+"euler_ancestral_cfg_pp",
+"heun",
+"heunpp2",
+"exp_heun_2_x0",
+"exp_heun_2_x0_sde",
+"dpm_2",
+"dpm_2_ancestral",
+"lms",
+"dpm_fast",
+"dpm_adaptive",
+"dpmpp_2s_ancestral",
+"dpmpp_2s_ancestral_cfg_pp",
+"dpmpp_sde",
+"dpmpp_sde_gpu",
+"dpmpp_2m",
+"dpmpp_2m_cfg_pp",
+"dpmpp_2m_sde",
+"dpmpp_2m_sde_gpu",
+"dpmpp_2m_sde_heun",
+"dpmpp_2m_sde_heun_gpu",
+"dpmpp_3m_sde",
+"dpmpp_3m_sde_gpu",
+"ddpm",
+"lcm",
+"ipndm",
+"ipndm_v",
+"deis",
+"cfgpp_ud10_ab",
+"res_multistep",
+"res_multistep_cfg_pp",
+"res_multistep_ancestral",
+"res_multistep_ancestral_cfg_pp",
+"gradient_estimation",
+"gradient_estimation_cfg_pp",
+"er_sde",
+"seeds_2",
+"seeds_3",
+"sa_solver",
+"sa_solver_pece",
+"ddim",
+"uni_pc",
+"uni_pc_bh2",
+"legacy_rk",
+"rk",
+"rk_beta",
+"deis_3m_ode",
+"deis_2m_ode",
+"deis_3m",
+"deis_2m",
+"res_6s_ode",
+"res_5s_ode",
+"res_3s_ode",
+"res_2s_ode",
+"res_3m_ode",
+"res_2m_ode",
+"res_6s",
+"res_5s",
+"res_3s",
+"res_2s",
+"res_3m",
+"res_2m"
+],
+{}
+],
+"scheduler": [
+[
+"simple",
+"sgm_uniform",
+"karras",
+"exponential",
+"ddim_uniform",
+"beta",
+"normal",
+"linear_quadratic",
+"kl_optimal",
+"bong_tangent",
+"beta57",
+"FlowMatchEulerDiscreteScheduler"
+],
+{}
+],
+"seed": [
+"INT",
+{
+"control_after_generate": true,
+"default": 0,
+"max": 18446744073709551615,
+"min": 0
+}
+],
+"steps": [
+"INT",
+{
+"default": 20,
+"max": 10000,
+"min": 1
+}
+]
+}
+},
+"name": "KSampler",
+"output": [
+"LATENT"
+],
+"output_name": [
+"LATENT"
+]
+},
+"KSamplerSelect": {
+"category": "model/sampling/samplers",
+"display_name": null,
+"input": {
+"required": {
+"sampler_name": [
+"COMBO",
+{
+"multiselect": false,
+"options": [
+"euler",
+"euler_cfg_pp",
+"euler_ancestral",
+"euler_ancestral_cfg_pp",
+"heun",
+"heunpp2",
+"exp_heun_2_x0",
+"exp_heun_2_x0_sde",
+"dpm_2",
+"dpm_2_ancestral",
+"lms",
+"dpm_fast",
+"dpm_adaptive",
+"dpmpp_2s_ancestral",
+"dpmpp_2s_ancestral_cfg_pp",
+"dpmpp_sde",
+"dpmpp_sde_gpu",
+"dpmpp_2m",
+"dpmpp_2m_cfg_pp",
+"dpmpp_2m_sde",
+"dpmpp_2m_sde_gpu",
+"dpmpp_2m_sde_heun",
+"dpmpp_2m_sde_heun_gpu",
+"dpmpp_3m_sde",
+"dpmpp_3m_sde_gpu",
+"ddpm",
+"lcm",
+"ipndm",
+"ipndm_v",
+"deis",
+"cfgpp_ud10_ab",
+"res_multistep",
+"res_multistep_cfg_pp",
+"res_multistep_ancestral",
+"res_multistep_ancestral_cfg_pp",
+"gradient_estimation",
+"gradient_estimation_cfg_pp",
+"er_sde",
+"seeds_2",
+"seeds_3",
+"sa_solver",
+"sa_solver_pece",
+"ddim",
+"uni_pc",
+"uni_pc_bh2",
+"legacy_rk",
+"rk",
+"rk_beta",
+"deis_3m_ode",
+"deis_2m_ode",
+"deis_3m",
+"deis_2m",
+"res_6s_ode",
+"res_5s_ode",
+"res_3s_ode",
+"res_2s_ode",
+"res_3m_ode",
+"res_2m_ode",
+"res_6s",
+"res_5s",
+"res_3s",
+"res_2s",
+"res_3m",
+"res_2m"
+]
+}
+]
+}
+},
+"name": "KSamplerSelect",
+"output": [
+"SAMPLER"
+],
+"output_name": [
+"SAMPLER"
+]
+},
+"LoadAudio": {
+"category": "audio",
+"display_name": "Load Audio",
+"input": {
+"required": {
+"audio": [
+"COMBO",
+{
+"audio_upload": true,
+"multiselect": false,
+"options": []
+}
+]
+}
+},
+"name": "LoadAudio",
+"output": [
+"AUDIO"
+],
+"output_name": [
+"AUDIO"
+]
+},
+"LoadImage": {
+"category": "image",
+"display_name": "Load Image",
+"input": {
+"required": {
+"image": [
+[],
+{
+"image_upload": true
+}
+]
+}
+},
+"name": "LoadImage",
+"output": [
+"IMAGE",
+"MASK"
+],
+"output_name": [
+"IMAGE",
+"MASK"
+]
+},
+"LoraLoaderModelOnly": {
+"category": "model/loaders",
+"display_name": "Load LoRA",
+"input": {
+"required": {
+"lora_name": [
+[
+"minimax_h3_fl2v_turbo_8step_v1.0_comfyui_bf16.safetensors",
+"minimax_h3_fl2v_lightx2v_turbo_4step_v0.1_comfy_int8convrot.safetensors",
+"BulletTime-MMH3.safetensors",
+"camera_motion_h3_lora_v1.safetensors",
+"person/sam_h3_v1.safetensors"
+]
+],
+"model": [
+"MODEL"
+],
+"strength_model": [
+"FLOAT",
+{
+"default": 1.0,
+"max": 100.0,
+"min": -100.0,
+"step": 0.01
+}
+]
+}
+},
+"name": "LoraLoaderModelOnly",
+"output": [
+"MODEL"
+],
+"output_name": [
+"MODEL"
+]
+},
+"MMH3LatentUpscaleWithModelParams": {
+"category": "PlagueKind/upscaling/minimax",
+"display_name": "MMH3 Latent Upscale with Model Params",
+"input": {
+"required": {
+"device": [
+"COMBO",
+{
+"default": "cuda",
+"multiselect": false,
+"options": [
+"cuda",
+"cpu"
+]
+}
+],
+"height": [
+"INT",
+{
+"default": 704,
+"max": 4096,
+"min": 64,
+"step": 32
+}
+],
+"model_name": [
+"COMBO",
+{
+"multiselect": false,
+"options": [
+"minimax_h3_latent_upscaler_3d_bf16.safetensors"
+]
+}
+],
+"precision": [
+"COMBO",
+{
+"default": "fp16",
+"multiselect": false,
+"options": [
+"fp16",
+"fp32",
+"bf16"
+]
+}
+],
+"width": [
+"INT",
+{
+"default": 1280,
+"max": 4096,
+"min": 64,
+"step": 32
+}
+]
+}
+},
+"name": "MMH3LatentUpscaleWithModelParams",
+"output": [
+"H3_UPSCALE_PARAM"
+],
+"output_name": [
+"latent_upscale_param"
+]
+},
+"MMH3SpatialSplitParams": {
+"category": "PlagueKind/upscaling/minimax",
+"display_name": "MMH3 Spatial Split Params",
+"input": {
+"required": {
+"fade_height": [
+"INT",
+{
+"default": 32,
+"max": 100000,
+"min": 0,
+"step": 32
+}
+],
+"fade_width": [
+"INT",
+{
+"default": 32,
+"max": 100000,
+"min": 0,
+"step": 32
+}
+],
+"grid_cols": [
+"INT",
+{
+"default": 2,
+"max": 9,
+"min": 1,
+"step": 1
+}
+],
+"grid_rows": [
+"INT",
+{
+"default": 2,
+"max": 9,
+"min": 1,
+"step": 1
+}
+],
+"joint_steps": [
+"BOOLEAN",
+{
+"default": true
+}
+],
+"min_tile_size": [
+"INT",
+{
+"default": 256,
+"max": 100000,
+"min": 0,
+"step": 32
+}
+],
+"overlap_blend": [
+"COMBO",
+{
+"default": "linear",
+"multiselect": false,
+"options": [
+"linear",
+"smoothstep",
+"overwrite",
+"midpoint"
+]
+}
+],
+"overlap_mode": [
+"COMBO",
+{
+"default": "earlier",
+"multiselect": false,
+"options": [
+"earlier",
+"later"
+]
+}
+],
+"spatial_h_overlap": [
+"INT",
+{
+"default": 128,
+"max": 100000,
+"min": 0,
+"step": 32
+}
+],
+"spatial_w_overlap": [
+"INT",
+{
+"default": 128,
+"max": 100000,
+"min": 0,
+"step": 32
+}
+],
+"tile_height": [
+"INT",
+{
+"default": 512,
+"max": 100000,
+"min": 32,
+"step": 32
+}
+],
+"tile_size_mode": [
+"COMBO",
+{
+"default": "specific_size",
+"multiselect": false,
+"options": [
+"specific_size",
+"rows_cols",
+"auto"
+]
+}
+],
+"tile_width": [
+"INT",
+{
+"default": 512,
+"max": 100000,
+"min": 32,
+"step": 32
+}
+],
+"token_budget": [
+"INT",
+{
+"default": 70000,
+"max": 1000000,
+"min": 4096,
+"step": 1024
+}
+],
+"upscale_height": [
+"INT",
+{
+"default": 1024,
+"max": 100000,
+"min": 32,
+"step": 32
+}
+],
+"upscale_width": [
+"INT",
+{
+"default": 1024,
+"max": 100000,
+"min": 32,
+"step": 32
+}
+]
+}
+},
+"name": "MMH3SpatialSplitParams",
+"output": [
+"H3_SPATIAL_PARAM",
+"INT",
+"INT"
+],
+"output_name": [
+"spatial_split_param",
+"tile_width",
+"tile_height"
+]
+},
+"MMH3TemporalSplitParams": {
+"category": "PlagueKind/upscaling/minimax",
+"display_name": "MMH3 Temporal Split Params",
+"input": {
+"required": {
+"anchor_strength": [
+"FLOAT",
+{
+"default": 0.999,
+"max": 1.0,
+"min": 0.0,
+"step": 0.01
+}
+],
+"chunk_length": [
+"INT",
+{
+"default": 136,
+"max": 100000,
+"min": 17,
+"step": 17
+}
+],
+"temporal_overlap": [
+"INT",
+{
+"default": 17,
+"max": 100000,
+"min": 0,
+"step": 17
+}
+]
+}
+},
+"name": "MMH3TemporalSplitParams",
+"output": [
+"H3_TEMPORAL_PARAM"
+],
+"output_name": [
+"temporal_split_param"
+]
+},
+"MMH3UltimateUpscale": {
+"category": "PlagueKind/upscaling/minimax",
+"display_name": "MMH3 Ultimate Upscale",
+"input": {
+"optional": {
+"latent_upscale_param": [
+"H3_UPSCALE_PARAM",
+{}
+],
+"negative": [
+"CONDITIONING",
+{}
+],
+"spatial_split_param": [
+"H3_SPATIAL_PARAM",
+{}
+],
+"temporal_split_param": [
+"H3_TEMPORAL_PARAM",
+{}
+]
+},
+"required": {
+"cfg": [
+"FLOAT",
+{
+"default": 1.0,
+"max": 100.0,
+"min": 0.0,
+"round": 0.01,
+"step": 0.1
+}
+],
+"conditioning": [
+"CONDITIONING",
+{}
+],
+"latent": [
+"LATENT",
+{}
+],
+"model": [
+"MODEL",
+{}
+],
+"noise": [
+"NOISE",
+{}
+],
+"sampler": [
+"SAMPLER",
+{}
+],
+"sigmas": [
+"SIGMAS",
+{}
+]
+}
+},
+"name": "MMH3UltimateUpscale",
+"output": [
+"LATENT",
+"DICT",
+"DICT"
+],
+"output_name": [
+"latent",
+"segments_info",
+"tiles_info"
+]
+},
+"ManualSigmas": {
+"category": "model/sampling/sigmas",
+"display_name": null,
+"input": {
+"required": {
+"sigmas": [
+"STRING",
+{
+"default": "1, 0.5",
+"multiline": false
+}
+]
+}
+},
+"name": "ManualSigmas",
+"output": [
+"SIGMAS"
+],
+"output_name": [
+"SIGMAS"
+]
+},
+"MiniMaxChunkFeedForward": {
+"category": "KJNodes/experimental",
+"display_name": "MiniMax H3 Chunk FeedForward",
+"input": {
+"required": {
+"chunks": [
+"INT",
+{
+"default": 2,
+"max": 64,
+"min": 1,
+"step": 1
+}
+],
+"model": [
+"MODEL",
+{}
+],
+"seq_threshold": [
+"INT",
+{
+"default": 4096,
+"max": 262144,
+"min": 256,
+"step": 256
+}
+]
+}
+},
+"name": "MiniMaxChunkFeedForward",
+"output": [
+"MODEL"
+],
+"output_name": [
+"model"
+]
+},
+"MiniMaxH3AudioVAECompatibility": {
+"category": "conditioning/minimax",
+"display_name": "H3 Audio VAE Compatibility",
+"input": {
+"required": {
+"audio_vae": [
+"VAE",
+{}
+]
+}
+},
+"name": "MiniMaxH3AudioVAECompatibility",
+"output": [
+"VAE"
+],
+"output_name": [
+"audio_vae"
+]
+},
+"MiniMaxH3GeneratedAVMaskedContext": {
+"category": "conditioning/minimax",
+"display_name": "H3 Generated AV Masked Context",
+"input": {
+"required": {
+"audio_feather_ticks": [
+"INT",
+{
+"default": 8,
+"max": 256,
+"min": 0
+}
+],
+"context_length": [
+"INT",
+{
+"default": 39,
+"max": 9999,
+"min": 5
+}
+],
+"latent": [
+"LATENT",
+{}
+],
+"source_latent": [
+"LATENT",
+{}
+]
+}
+},
+"name": "MiniMaxH3GeneratedAVMaskedContext",
+"output": [
+"LATENT",
+"INT"
+],
+"output_name": [
+"latent",
+"trim_frames"
+]
+},
+"MiniMaxH3MotionContextTrim": {
+"category": "conditioning/minimax",
+"display_name": "H3 Motion Context Trim",
+"input": {
+"optional": {
+"audio": [
+"AUDIO",
+{}
+],
+"fps": [
+"FLOAT",
+{
+"default": 24.0,
+"max": 24.0,
+"min": 24.0,
+"step": 0.001
+}
+],
+"match_tail": [
+"BOOLEAN",
+{
+"default": true
+}
+],
+"video_crossfade_frames": [
+"INT",
+{
+"default": 39,
+"max": 9999,
+"min": 1
+}
+]
+},
+"required": {
+"images": [
+"IMAGE"
+],
+"trim_frames": [
+"INT",
+{
+"default": 0,
+"max": 4096,
+"min": 0
+}
+]
+}
+},
+"name": "MiniMaxH3MotionContextTrim",
+"output": [
+"IMAGE",
+"AUDIO",
+"IMAGE",
+"INT"
+],
+"output_name": [
+"images",
+"audio",
+"crossfade_images",
+"crossfade_frames"
+]
+},
+"MiniMaxH3ReferenceToVideo": {
+"category": "model/conditioning/minimax",
+"display_name": "MiniMax H3 Reference to Video",
+"input": {
+"optional": {
+"audio_vae": [
+"VAE",
+{}
+],
+"ref_audios": [
+"COMFY_AUTOGROW_V3",
+{}
+],
+"ref_images": [
+"COMFY_AUTOGROW_V3",
+{}
+],
+"ref_video_audios": [
+"COMFY_AUTOGROW_V3",
+{}
+],
+"ref_videos": [
+"COMFY_AUTOGROW_V3",
+{}
+],
+"vae": [
+"VAE",
+{}
+]
+},
+"required": {
+"clip": [
+"CLIP",
+{}
+],
+"height": [
+"INT",
+{
+"default": 768,
+"max": 16384,
+"min": 32
+}
+],
+"length": [
+"INT",
+{
+"default": 124,
+"max": 3600,
+"min": 5
+}
+],
+"prompt": [
+"STRING",
+{}
+],
+"ref_image_size": [
+"COMBO",
+{
+"default": "match",
+"options": [
+"match",
+"max"
+]
+}
+],
+"width": [
+"INT",
+{
+"default": 1344,
+"max": 16384,
+"min": 32
+}
+]
+}
+},
+"name": "MiniMaxH3ReferenceToVideo",
+"output": [
+"CONDITIONING",
+"LATENT"
+],
+"output_name": [
+"positive",
+"LATENT"
+]
+},
+"MiniMaxH3SigmaShift": {
+"category": "model/patch/minimax",
+"display_name": "ModelSamplingMiniMaxH3",
+"input": {
+"required": {
+"model": [
+"MODEL",
+{}
+],
+"shift_audio": [
+"FLOAT",
+{
+"default": 3.0,
+"max": 100.0,
+"min": 0.01,
+"step": 0.01
+}
+],
+"shift_video": [
+"FLOAT",
+{
+"default": 12.0,
+"max": 100.0,
+"min": 0.01,
+"step": 0.01
+}
+]
+}
+},
+"name": "MiniMaxH3SigmaShift",
+"output": [
+"MODEL"
+],
+"output_name": [
+"MODEL"
+]
+},
+"MiniMaxH3Validate24FPSVideo": {
+"category": "conditioning/minimax",
+"display_name": "H3 Validate 24 FPS Video",
+"input": {
+"required": {
+"images": [
+"IMAGE",
+{}
+],
+"video_info": [
+"VHS_VIDEOINFO",
+{}
+]
+}
+},
+"name": "MiniMaxH3Validate24FPSVideo",
+"output": [
+"IMAGE"
+],
+"output_name": [
+"images"
+]
+},
+"MiniMaxLowVRAMAttention": {
+"category": "KJNodes/experimental",
+"display_name": "MiniMax H3 Low VRAM Attention",
+"input": {
+"required": {
+"head_chunks": [
+"INT",
+{
+"default": 4,
+"max": 56,
+"min": 1,
+"step": 1
+}
+],
+"model": [
+"MODEL",
+{}
+]
+}
+},
+"name": "MiniMaxLowVRAMAttention",
+"output": [
+"MODEL"
+],
+"output_name": [
+"model"
+]
+},
+"ModelPreviewOverrideKJ": {
+"category": "KJNodes/sampling",
+"display_name": "Model Preview Override",
+"input": {
+"hidden": {
+"unique_id": [
+"UNIQUE_ID"
+]
+},
+"optional": {
+"tiny_vae": [
+"COMBO",
+{
+"default": "none",
+"multiselect": false,
+"options": [
+"taeh3.safetensors"
+]
+}
+],
+"vae": [
+"VAE",
+{}
+]
+},
+"required": {
+"jpeg_quality": [
+"INT",
+{
+"default": 80,
+"max": 100,
+"min": 30,
+"step": 1
+}
+],
+"max_resolution": [
+"INT",
+{
+"default": 1024,
+"max": 8192,
+"min": 0,
+"step": 8
+}
+],
+"model": [
+"MODEL",
+{}
+],
+"preview_fps": [
+"INT",
+{
+"default": 12,
+"max": 60,
+"min": 1,
+"step": 1
+}
+],
+"preview_frames": [
+"INT",
+{
+"default": 1,
+"max": 1024,
+"min": 1,
+"step": 1
+}
+],
+"suppress_default_preview": [
+"BOOLEAN",
+{
+"default": true
+}
+]
+}
+},
+"name": "ModelPreviewOverrideKJ",
+"output": [
+"MODEL"
+],
+"output_name": [
+"MODEL"
+]
+},
+"PK_MiniMaxH3Combined": {
+"category": "PlagueKind/minimax",
+"display_name": "PK MiniMax H3 Combined Reference to Video",
+"input": {
+"optional": {
+"audio": [
+"AUDIO",
+{}
+],
+"audio_vae": [
+"VAE",
+{}
+],
+"first_frame": [
+"IMAGE",
+{}
+],
+"last_frame": [
+"IMAGE",
+{}
+],
+"mods": [
+"H3_REF_MODS",
+{}
+],
+"reference_images": [
+"COMFY_AUTOGROW_V3",
+{
+"template": {
+"input": {
+"required": {
+"reference_image": [
+"IMAGE",
+{
+"tooltip": "Reference image (downscaled to 2048 short edge if larger, never upscaled)"
+}
+]
+}
+},
+"max": 9,
+"min": 0,
+"prefix": "reference_image_"
+}
+}
+],
+"references": [
+"H3_REFS",
+{}
+],
+"vae": [
+"VAE",
+{}
+],
+"video": [
+"IMAGE",
+{}
+]
+},
+"required": {
+"clip": [
+"CLIP",
+{}
+],
+"height": [
+"INT",
+{
+"default": 768,
+"max": 16384,
+"min": 32,
+"step": 32
+}
+],
+"length": [
+"INT",
+{
+"default": 124,
+"max": 3600,
+"min": 5,
+"step": 17
+}
+],
+"max_total_tokens": [
+"INT",
+{
+"default": 0,
+"max": 2147483647,
+"min": 0
+}
+],
+"prompt": [
+"STRING",
+{
+"dynamicPrompts": true,
+"multiline": true
+}
+],
+"ref_image_size": [
+"COMBO",
+{
+"default": "match",
+"multiselect": false,
+"options": [
+"match",
+"max",
+"none"
+]
+}
+],
+"reference_fps": [
+"FLOAT",
+{
+"default": 24.0,
+"max": 120.0,
+"min": 1.0
+}
+],
+"vlm_resolution": [
+"INT",
+{
+"default": 384,
+"max": 4096,
+"min": 0,
+"step": 32
+}
+],
+"vlm_video_resolution": [
+"INT",
+{
+"default": 384,
+"max": 4096,
+"min": 0,
+"step": 32
+}
+],
+"width": [
+"INT",
+{
+"default": 1344,
+"max": 16384,
+"min": 32,
+"step": 32
+}
+]
+}
+},
+"name": "PK_MiniMaxH3Combined",
+"output": [
+"CONDITIONING",
+"LATENT",
+"STRING"
+],
+"output_name": [
+"conditioning",
+"latent",
+"reference_map"
+]
+},
+"QwenImage21Cache": {
+"category": "model/conditioning/qwen image",
+"display_name": "Qwen Image 2.1 Cache",
+"input": {
+"required": {
+"device": [
+"COMBO",
+{
+"default": "auto",
+"multiselect": false,
+"options": [
+"auto",
+"gpu",
+"cpu",
+"off"
+]
+}
+],
+"dtype": [
+"COMBO",
+{
+"default": "default",
+"multiselect": false,
+"options": [
+"default",
+"int8",
+"int4"
+]
+}
+],
+"model": [
+"MODEL",
+{}
+]
+}
+},
+"name": "QwenImage21Cache",
+"output": [
+"MODEL"
+],
+"output_name": [
+"MODEL"
+]
+},
+"RandomNoise": {
+"category": "model/sampling/noise",
+"display_name": null,
+"input": {
+"required": {
+"noise_seed": [
+"INT",
+{
+"control_after_generate": true,
+"default": 0,
+"max": 18446744073709551615,
+"min": 0
+}
+]
+}
+},
+"name": "RandomNoise",
+"output": [
+"NOISE"
+],
+"output_name": [
+"NOISE"
+]
+},
+"SamplerCustomAdvanced": {
+"category": "model/sampling/custom",
+"display_name": null,
+"input": {
+"required": {
+"guider": [
+"GUIDER",
+{}
+],
+"latent_image": [
+"LATENT",
+{}
+],
+"noise": [
+"NOISE",
+{}
+],
+"sampler": [
+"SAMPLER",
+{}
+],
+"sigmas": [
+"SIGMAS",
+{}
+]
+}
+},
+"name": "SamplerCustomAdvanced",
+"output": [
+"LATENT",
+"LATENT"
+],
+"output_name": [
+"output",
+"denoised_output"
+]
+},
+"SaveAudio": {
+"category": "audio",
+"display_name": "Save Audio (FLAC) (DEPRECATED)",
+"input": {
+"hidden": {
+"extra_pnginfo": [
+"EXTRA_PNGINFO"
+],
+"prompt": [
+"PROMPT"
+]
+},
+"required": {
+"audio": [
+"AUDIO",
+{}
+],
+"filename_prefix": [
+"STRING",
+{
+"default": "audio/ComfyUI",
+"multiline": false
+}
+]
+}
+},
+"name": "SaveAudio",
+"output": [
+"AUDIO"
+],
+"output_name": [
+"audio"
+]
+},
+"SaveImage": {
+"category": "image",
+"display_name": "Save Image",
+"input": {
+"hidden": {
+"extra_pnginfo": "EXTRA_PNGINFO",
+"prompt": "PROMPT"
+},
+"required": {
+"filename_prefix": [
+"STRING",
+{
+"default": "ComfyUI"
+}
+],
+"images": [
+"IMAGE",
+{}
+]
+}
+},
+"name": "SaveImage",
+"output": [
+"IMAGE"
+],
+"output_name": [
+"images"
+]
+},
+"TextEncodeQwenImage21": {
+"category": "model/conditioning/qwen image",
+"display_name": "Text Encode Qwen Image 2.1",
+"input": {
+"optional": {
+"vae": [
+"VAE",
+{}
+]
+},
+"required": {
+"clip": [
+"CLIP",
+{}
+],
+"images": [
+"COMFY_AUTOGROW_V3",
+{
+"template": {
+"input": {
+"required": {
+"image": [
+"IMAGE",
+{}
+]
+}
+},
+"min": 0,
+"names": [
+"image_1",
+"image_2",
+"image_3",
+"image_4",
+"image_5",
+"image_6",
+"image_7",
+"image_8",
+"image_9",
+"image_10",
+"image_11",
+"image_12",
+"image_13",
+"image_14",
+"image_15",
+"image_16"
+]
+}
+}
+],
+"negative_prompt": [
+"STRING",
+{
+"dynamicPrompts": true,
+"multiline": true
+}
+],
+"prompt": [
+"STRING",
+{
+"dynamicPrompts": true,
+"multiline": true
+}
+],
+"resolution": [
+"INT",
+{
+"default": 1024,
+"max": 4096,
+"min": 0,
+"step": 32
+}
+]
+}
+},
+"name": "TextEncodeQwenImage21",
+"output": [
+"CONDITIONING",
+"CONDITIONING",
+"LATENT"
+],
+"output_name": [
+"positive",
+"negative",
+"latent"
+]
+},
+"UNETLoader": {
+"category": "model/loaders",
+"display_name": "Load Diffusion Model",
+"input": {
+"required": {
+"unet_name": [
+[
+"minimax_h3_fl2va_pruned_int8_convrot.safetensors",
+"minimax_h3_fl2va_pruned_w4a8_mixed.safetensors",
+"minimax_h3_hybrid_fl2va_ref2va_b25-49-int8.safetensors",
+"minimax_h3_ref2va_pruned_int8_convrot.safetensors",
+"minimax_h3_ref2va_pruned_w4a8_mixed.safetensors",
+"qwen_image_2.1_bf16.safetensors",
+"qwen_image_2.1_int8_convrot.safetensors",
+"qwen_image_2512_fp8_e4m3fn.safetensors",
+"qwen_image_edit_2509_fp8_e4m3fn.safetensors"
+]
+],
+"weight_dtype": [
+[
+"default",
+"fp8_e4m3fn",
+"fp8_e4m3fn_fast",
+"fp8_e5m2"
+],
+{
+"advanced": true
+}
+]
+}
+},
+"name": "UNETLoader",
+"output": [
+"MODEL"
+],
+"output_name": [
+"MODEL"
+]
+},
+"UnifiedTTSTextNode": {
+"category": "TTS Audio Suite/\ud83c\udfa4 Text to Speech",
+"display_name": "\ud83c\udfa4 TTS Text",
+"input": {
+"optional": {
+"batch_size": [
+"INT",
+{
+"default": 0,
+"max": 32,
+"min": 0,
+"step": 1
+}
+],
+"chunk_combination_method": [
+[
+"auto",
+"concatenate",
+"silence_padding",
+"crossfade"
+],
+{
+"default": "auto"
+}
+],
+"enable_audio_cache": [
+"BOOLEAN",
+{
+"default": true
+}
+],
+"enable_chunking": [
+"BOOLEAN",
+{
+"default": true
+}
+],
+"max_chars_per_chunk": [
+"INT",
+{
+"default": 400,
+"max": 1000,
+"min": 100,
+"step": 50
+}
+],
+"opt_narrator": [
+"*",
+{}
+],
+"silence_between_chunks_ms": [
+"INT",
+{
+"default": 100,
+"max": 500,
+"min": 0,
+"step": 25
+}
+]
+},
+"required": {
+"TTS_engine": [
+"TTS_ENGINE",
+{}
+],
+"narrator_voice": [
+[
+"none",
+"narrator.wav",
+"voices_examples/example_voice.wav"
+],
+{
+"default": "none"
+}
+],
+"seed": [
+"INT",
+{
+"default": 1,
+"max": 4294967295,
+"min": 0
+}
+],
+"text": [
+"STRING",
+{
+"default": "Hello! This is unified TTS with character switching support.\n[Alice] Hi there! I'm Alice speaking with the selected TTS engine.\n[Bob] And I'm Bob! This works with any TTS engine.\nBack to the main narrator voice for the conclusion.",
+"multiline": true
+}
+]
+}
+},
+"name": "UnifiedTTSTextNode",
+"output": [
+"AUDIO",
+"STRING"
+],
+"output_name": [
+"audio",
+"generation_info"
+]
+},
+"VAEDecode": {
+"category": "model/latent",
+"display_name": "VAE Decode",
+"input": {
+"required": {
+"samples": [
+"LATENT",
+{}
+],
+"vae": [
+"VAE",
+{}
+]
+}
+},
+"name": "VAEDecode",
+"output": [
+"IMAGE"
+],
+"output_name": [
+"IMAGE"
+]
+},
+"VAEDecodeAudio": {
+"category": "model/latent",
+"display_name": "VAE Decode Audio",
+"input": {
+"required": {
+"samples": [
+"LATENT",
+{}
+],
+"vae": [
+"VAE",
+{}
+]
+}
+},
+"name": "VAEDecodeAudio",
+"output": [
+"AUDIO"
+],
+"output_name": [
+"AUDIO"
+]
+},
+"VAELoader": {
+"category": "model/loaders",
+"display_name": "Load VAE",
+"input": {
+"required": {
+"vae_name": [
+[
+"minimax_h3_audio_vae_fp32.safetensors",
+"minimax_h3_video_vae_fp16.safetensors",
+"minimax_h3_video_vae_int8_convrot.safetensors",
+"qwen_image_2.1_vae_bf16.safetensors",
+"qwen_image_vae.safetensors",
+"qwen_image_vae_old.safetensors",
+"taeh3.safetensors"
+]
+]
+}
+},
+"name": "VAELoader",
+"output": [
+"VAE"
+],
+"output_name": [
+"VAE"
+]
+},
+"VHS_LoadVideoPath": {
+"category": "Video Helper Suite \ud83c\udfa5\ud83c\udd65\ud83c\udd57\ud83c\udd62",
+"display_name": "Load Video (Path) \ud83c\udfa5\ud83c\udd65\ud83c\udd57\ud83c\udd62",
+"input": {
+"optional": {
+"format": [
+[
+"None",
+"AnimateDiff",
+"Mochi",
+"LTXV",
+"Hunyuan",
+"Cosmos",
+"Wan"
+],
+{
+"default": "AnimateDiff"
+}
+],
+"meta_batch": [
+"VHS_BatchManager",
+{}
+],
+"vae": [
+"VAE",
+{}
+]
+},
+"required": {
+"custom_height": [
+"INT",
+{
+"default": 0,
+"max": 8192,
+"min": 0
+}
+],
+"custom_width": [
+"INT",
+{
+"default": 0,
+"max": 8192,
+"min": 0
+}
+],
+"force_rate": [
+"FLOAT",
+{
+"default": 0,
+"max": 60,
+"min": 0
+}
+],
+"frame_load_cap": [
+"INT",
+{
+"default": 0,
+"max": 9007199254740991,
+"min": 0
+}
+],
+"select_every_nth": [
+"INT",
+{
+"default": 1,
+"max": 9007199254740991,
+"min": 1
+}
+],
+"skip_first_frames": [
+"INT",
+{
+"default": 0,
+"max": 9007199254740991,
+"min": 0
+}
+],
+"video": [
+"STRING",
+{}
+]
+}
+},
+"name": "VHS_LoadVideoPath",
+"output": [
+"IMAGE",
+"INT",
+"AUDIO",
+"VHS_VIDEOINFO"
+],
+"output_name": [
+"IMAGE",
+"frame_count",
+"audio",
+"video_info"
+]
+}
+}

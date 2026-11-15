@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>H3 Studio</title>
+<link rel="icon" href="/static/icon.svg">
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<div id="shell">
+  <nav id="side" aria-label="Rooms"></nav>
+  <main id="room" tabindex="-1"></main>
+  <aside id="queue" aria-label="Queue"></aside>
+</div>
+<section id="term" aria-label="ComfyUI output" hidden></section>
+<div id="modal" hidden></div>
+<div id="toasts" aria-live="polite"></div>
+<script src="/static/app.js"></script>
+<script src="/static/widgets.js"></script>
+<script src="/static/create.js"></script>
+<script src="/static/films.js"></script>
+<script src="/static/writer.js"></script>
+<script src="/static/library.js"></script>
+<script src="/static/edit.js"></script>
+<script src="/static/studio.js"></script>
+<script>boot();</script>
+</body>
+</html>

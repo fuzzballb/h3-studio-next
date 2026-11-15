@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.venv/
+node_modules/
+# local-only: stories that use private photos or names stay out of the repo
+story_kit/stories/_private/
+*.local.json

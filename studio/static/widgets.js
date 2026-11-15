@@ -257,7 +257,8 @@ function assetActions(a, full) {
   const leave = fn => () => { closeModal(); fn(); };
   if (a.kind === "image" || a.kind === "sheet") {
     out.push(b("Animate", leave(() => go("video", "", { start: "first", first_frame: a.ref })), "primary"));
-    out.push(b("Edit", leave(() => go("edit", "", { picture: a.ref }))));
+    out.push(b("Edit", leave(() => go("picture", "", { attach: [{ ref: a.ref, thumb: a.thumb }] }))));
+    if (full) out.push(b("Remix", leave(() => go("remix", "", { asset: a }))));
     if (full) {
       out.push(b("As a reference", leave(() => go("video", "", { start: "refs", refs: [{ file: a.ref, label: a.name }] }))));
       out.push(b("Ends a clip", leave(() => go("video", "", { start: "first_last", last_frame: a.ref }))));

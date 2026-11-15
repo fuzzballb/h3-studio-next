@@ -125,16 +125,33 @@ def update(ident, **fields):
         return dict(a)
 
 
-def search(q="", kind="", film="", trashed=False, limit=500):
-    """Newest first. `q` is looked for in the name, the prompt, the tags and the film's name; every word must be there."""
+SORTS = {"newest": (lambda a: a.get("created", 0), True), "oldest": (lambda a: a.get("created", 0), False),
+         "largest": (lambda a: a.get("size", 0), True), "smallest": (lambda a: a.get("size", 0), False),
+         "name": (lambda a: (a.get("name") or "").lower(), False)}
+
+
+def search(q="", kind="", film="", trashed=False, limit=500, favorite=False, folder="", source="", surface="", sort="newest"):
+    """Newest first. `q` is looked for in the name, the prompt, the tags and the film's name; every word must be there.
+    `kind` may be several kinds joined with commas. `folder` is a folder id, or "none" for files in no folder.
+    `source` is "upload" (uploaded or brought in) or "made". `surface` is the page a clip was made on (remix, shorts)."""
     words = [w for w in (q or "").lower().split() if w]
+    kinds = {k for k in (kind or "").split(",") if k}
     out = []
     with _lock:
         items = list(_load().values())
     for a in items:
         if bool(a.get("trashed")) != bool(trashed):
             continue
-        if kind and a.get("kind") != kind:
+        if kinds and a.get("kind") not in kinds:
+            continue
+        if favorite and not a.get("favorite"):
+            continue
+        if folder and (a.get("folder") or "none") != folder:
+            continue
+        uploaded = bool(a.get("uploaded") or a.get("imported"))
+        if source and (source == "upload") != uploaded:
+            continue
+        if surface and a.get("surface") != surface:
             continue
         if film and a.get("film") != film:
             continue
@@ -144,8 +161,111 @@ def search(q="", kind="", film="", trashed=False, limit=500):
             if not all(w in hay for w in words):
                 continue
         out.append(dict(a))
-    out.sort(key=lambda a: a.get("created", 0), reverse=True)
+    key, rev = SORTS.get(sort) or SORTS["newest"]
+    out.sort(key=key, reverse=rev)
     return out[:limit]
+
+
+# ------------------------------------------------------------------ favourites and folders
+def _folders_path():
+    return config.home("library", "folders.json")
+
+
+def folders():
+    with _lock:
+        return list(config.read_json(_folders_path(), []) or [])
+
+
+def _save_folders(rows):
+    config.write_json(_folders_path(), rows)
+
+
+def add_folder(name):
+    name = (name or "").strip()[:80]
+    if not name:
+        raise ValueError("give the folder a name")
+    with _lock:
+        rows = folders()
+        if any(f["name"].lower() == name.lower() for f in rows):
+            raise ValueError(f"there is already a folder called {name}")
+        if len(rows) >= 500:
+            raise ValueError("500 folders is the most")
+        f = {"id": "fo" + uuid.uuid4().hex[:8], "name": name, "created": time.time()}
+        rows.append(f)
+        _save_folders(rows)
+        return f
+
+
+def rename_folder(fid, name):
+    name = (name or "").strip()[:80]
+    if not name:
+        raise ValueError("give the folder a name")
+    with _lock:
+        rows = folders()
+        f = next((x for x in rows if x["id"] == fid), None)
+        if not f:
+            raise KeyError("folder")
+        if any(x["name"].lower() == name.lower() and x["id"] != fid for x in rows):
+            raise ValueError(f"there is already a folder called {name}")
+        f["name"] = name
+        _save_folders(rows)
+        return f
+
+
+def delete_folder(fid):
+    """The folder goes; its files stay in the Library, in no folder."""
+    with _lock:
+        rows = folders()
+        if not any(x["id"] == fid for x in rows):
+            raise KeyError("folder")
+        _save_folders([x for x in rows if x["id"] != fid])
+        idx = _load()
+        for a in idx.values():
+            if a.get("folder") == fid:
+                a.pop("folder", None)
+        _save()
+
+
+def bulk(ids, action, folder=""):
+    """favorite / unfavorite / move (to `folder`, "" = no folder) for many files at once. All or nothing."""
+    if action not in ("favorite", "unfavorite", "move"):
+        raise ValueError("action is favorite, unfavorite or move")
+    ids = list(ids or [])[:200]
+    with _lock:
+        idx = _load()
+        missing = [i for i in ids if i not in idx]
+        if missing:
+            raise KeyError("asset")
+        if action == "move" and folder and not any(f["id"] == folder for f in folders()):
+            raise KeyError("folder")
+        for i in ids:
+            a = idx[i]
+            if action == "move":
+                if folder:
+                    a["folder"] = folder
+                else:
+                    a.pop("folder", None)
+            else:
+                a["favorite"] = action == "favorite"
+        _save()
+    return len(ids)
+
+
+def summary():
+    """Counts for the Library's side list."""
+    with _lock:
+        items = [a for a in _load().values()]
+    live = [a for a in items if not a.get("trashed")]
+    count = lambda f: sum(1 for a in live if f(a))
+    kinds = {k: count(lambda a, k=k: a.get("kind") == k) for k in KINDS}
+    per_folder = {}
+    for a in live:
+        if a.get("folder"):
+            per_folder[a["folder"]] = per_folder.get(a["folder"], 0) + 1
+    return {"all": len(live), "kinds": kinds, "favorites": count(lambda a: a.get("favorite")),
+            "uploads": count(lambda a: a.get("uploaded") or a.get("imported")),
+            "folders": [{**f, "count": per_folder.get(f["id"], 0)} for f in folders()],
+            "trash": sum(1 for a in items if a.get("trashed")), "bytes": sum(a.get("size", 0) for a in live)}
 
 
 def thumb(asset):

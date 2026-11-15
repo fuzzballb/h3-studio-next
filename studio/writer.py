@@ -212,14 +212,16 @@ def state():
             "why": "" if exe else "the claude command is not installed or not on the PATH of the studio"}
 
 
-async def ask(c):
+async def run_claude(system, schema, text, timeout=TIMEOUT):
+    """One turn of Claude Code with no tools: `text` in, the JSON object that fits `schema` out. Also used by the
+    agent chat and the Shorts planner. Returns (answer, meta); answer is None when Claude sent plain text instead."""
     st = state()
     if not st["ok"]:
-        raise ValueError("the Writer needs Claude Code: " + st["why"])
+        raise ValueError("this needs Claude Code: " + st["why"])
     work = config.home("writer", "workdir")                # an empty folder: nothing of this computer is read
     os.makedirs(work, exist_ok=True)
     env = {k: v for k, v in os.environ.items() if not k.startswith(("CLAUDE", "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"))}
-    args = [st["command"], "-p", "--output-format", "json", "--json-schema", json.dumps(SCHEMA), "--system-prompt", system_prompt(),
+    args = [st["command"], "-p", "--output-format", "json", "--json-schema", json.dumps(schema), "--system-prompt", system,
             "--tools", "", "--safe-mode", "--strict-mcp-config", "--no-session-persistence", "--disable-slash-commands"]
     if st["model"]:
         args += ["--model", st["model"]]
@@ -227,15 +229,15 @@ async def ask(c):
     proc = await asyncio.create_subprocess_exec(*args, cwd=work, env=env, stdin=asyncio.subprocess.PIPE,
                                                 stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
     try:
-        out, err = await asyncio.wait_for(proc.communicate(transcript(c).encode()), TIMEOUT)
+        out, err = await asyncio.wait_for(proc.communicate(text.encode()), timeout)
     except asyncio.TimeoutError:
         proc.kill()
-        raise ValueError(f"Claude gave no answer within {TIMEOUT // 60} minutes")
-    text = out.decode("utf-8", "replace").strip()
+        raise ValueError(f"Claude gave no answer within {timeout // 60} minutes")
+    raw = out.decode("utf-8", "replace").strip()
     try:
-        res = json.loads(text)
+        res = json.loads(raw)
     except ValueError:
-        raise ValueError("Claude Code did not answer: " + (err.decode("utf-8", "replace").strip() or text)[-300:])
+        raise ValueError("Claude Code did not answer: " + (err.decode("utf-8", "replace").strip() or raw)[-300:])
     if isinstance(res, list):
         res = next((r for r in reversed(res) if isinstance(r, dict) and r.get("type") == "result"), {})
     if res.get("is_error") or res.get("subtype") != "success":
@@ -245,9 +247,17 @@ async def ask(c):
         try:
             answer = json.loads(res.get("result") or "")
         except ValueError:
-            answer = {"say": res.get("result") or "", "questions": [], "film": None, "edits": None}
+            answer = None
     meta = {"seconds": round(time.time() - t0, 1), "model": ",".join((res.get("modelUsage") or {}).keys()),
-            "cost_usd": res.get("total_cost_usd")}
+            "cost_usd": res.get("total_cost_usd"), "text": res.get("result") or ""}
+    return answer, meta
+
+
+async def ask(c):
+    answer, meta = await run_claude(system_prompt(), SCHEMA, transcript(c))
+    if answer is None:
+        answer = {"say": meta.get("text") or "", "questions": [], "film": None, "edits": None}
+    meta.pop("text", None)
     return clean(answer), meta
 
 

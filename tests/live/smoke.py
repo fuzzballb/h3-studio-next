@@ -1,7 +1,7 @@
 """A live run through the studio's API on a real ComfyUI: a picture, an edit, a clip that opens on the picture, a part
 that continues it, the checks, the Library. Needs the studio running (./run_studio.sh) and the models installed.
 
-    python3 tests/live/smoke.py [--url http://127.0.0.1:8190] [--skip-video]
+    python3 tests/live/smoke.py [--url http://127.0.0.1:8191] [--skip-video]
 
 It renders small (864x480, 3 and 5 seconds) and takes about five minutes on an RTX 3090. Nothing is deleted afterwards:
 the results are in the Library, named "smoke ...".
@@ -14,7 +14,7 @@ import urllib.error
 import urllib.request
 
 ap = argparse.ArgumentParser()
-ap.add_argument("--url", default="http://127.0.0.1:8190")
+ap.add_argument("--url", default="http://127.0.0.1:8191")
 ap.add_argument("--skip-video", action="store_true")
 A = ap.parse_args()
 

@@ -1,6 +1,6 @@
 # Agents and the API
 
-Everything the page does, it does through a JSON API on the same address (`http://127.0.0.1:8190` by default). A script
+Everything the page does, it does through a JSON API on the same address (`http://127.0.0.1:8191` by default). A script
 or an agent can do the same. There is no sign-in: the server listens on this computer only, and refuses requests from
 other sites' pages.
 
@@ -35,11 +35,11 @@ render again; do not approve it with a note.
 
 ```bash
 # a picture, then a clip that opens on it
-curl -s -X POST 127.0.0.1:8190/api/images -H 'Content-Type: application/json' \
+curl -s -X POST 127.0.0.1:8191/api/images -H 'Content-Type: application/json' \
      -d '{"prompt": "A rowing boat at a jetty at dawn, mist over the lake, photo.", "width": 1024, "height": 576}'
-curl -s 127.0.0.1:8190/api/jobs/<job id>          # until "status": "done"; result.assets holds the Library ids
-curl -s 127.0.0.1:8190/api/library/<asset id>     # "ref" is the name to use as a picture
-curl -s -X POST 127.0.0.1:8190/api/clips -H 'Content-Type: application/json' \
+curl -s 127.0.0.1:8191/api/jobs/<job id>          # until "status": "done"; result.assets holds the Library ids
+curl -s 127.0.0.1:8191/api/library/<asset id>     # "ref" is the name to use as a picture
+curl -s -X POST 127.0.0.1:8191/api/clips -H 'Content-Type: application/json' \
      -d '{"first_frame": "<ref>", "action": "The boat rocks gently. A duck swims past.", "frames": 124, "width": 864, "height": 480}'
 ```
 
@@ -88,7 +88,7 @@ A job is `{id, kind, title, status, progress, result, error}` with status `queue
 |---|---|---|
 | GET | `/api/library` | `?q=&kind=&film=&trashed=1`. `q` looks in names and prompts. |
 | GET | `/api/library/{id}` | One file: `url`, `thumb`, `ref` (its name as a picture or voice), prompt, seed, checks. |
-| POST | `/api/upload` | Multipart, field `file`. Kept under `output/studio/uploads`. |
+| POST | `/api/upload` | Multipart, field `file`. Kept under `output/studio_next/uploads`. |
 | POST | `/api/library/import` | `{path}`: a file already under ComfyUI's output or input folder. |
 | POST | `/api/frame` | `{asset, at: seconds \| "first" \| "last"}`: a frame of a clip as a picture. |
 | POST | `/api/library/trash`, `/restore`, `/empty-trash` | `{ids}`; restore without ids undoes the last deletion; emptying needs `{"confirm": "erase"}`. |
@@ -152,16 +152,42 @@ A conversation with Claude through the Claude Code program on this computer (`cl
 | POST | `/api/nightshift/{id}/start`, `/cancel` | |
 | POST | `/api/dailies` | `{film, since}`: a reel and notes of a film's takes. |
 
+### What H3 Studio Next adds
+
+| | | |
+|---|---|---|
+| GET | `/api/library` | Also takes `favorite=1`, `folder=<id> \| none`, `source=upload \| made`, `surface=<name>`, `sort=newest \| oldest \| name \| kind`, and `kind` as a comma list. |
+| GET | `/api/library/summary` | Counts per kind, favourites, uploads, trash and folders, for the Library's side list. |
+| PATCH | `/api/library/{id}` | `{favorite, name, folder}`. |
+| POST | `/api/library/bulk` | `{ids, action: favorite \| unfavorite \| move, folder}`. All or nothing; at most 200 ids. |
+| GET, POST | `/api/folders` | List, or `{name}` makes one (names are unique, any case). |
+| PATCH, DELETE | `/api/folders/{id}` | Rename; delete (its files stay, in no folder). |
+| POST | `/api/estimate` | `{kind: image, takes}` → about how many seconds, from this machine's past renders. |
+| GET, POST | `/api/canvas` | The boards; `{name}` makes one. |
+| GET, PUT, DELETE | `/api/canvas/{id}` | GET adds `assets` (the Library records on the board, `null` when gone). PUT replaces `{name, items, view}`. |
+| GET, POST | `/api/agent` | The chats, and whether Claude Code is there; POST starts a chat. |
+| GET, PATCH, DELETE | `/api/agent/{id}` | PATCH `{ask_first, title}`. GET fills in each action's job, progress and what it made. |
+| POST | `/api/agent/{id}/say` | `{text}`: Claude Code answers with words and actions. With `ask_first` the actions wait as `proposed`. |
+| POST | `/api/agent/{id}/act` | `{action, allow}`: run a proposed (or failed) action, or say no. |
+| POST | `/api/shorts/plan` | `{idea, parts}` → a plan: title, look, place, people, beats with the action, sound and exact lines. |
+| POST | `/api/shorts` | `{plan, size, face, voice}`: renders the plan as one film whose parts continue each other. |
+
+Pictures and quick clips keep `form` (the request they were made with) and `surface` (the page they came from) on their
+Library record; Recreate uses them.
+
 ## Where things are
 
 Everything is under ComfyUI's output folder:
 
 ```
-output/studio/                 the studio's own data (STUDIO_HOME)
+output/studio_next/            the studio's own data (STUDIO_HOME)
   settings.json  jobs.json  telemetry.json
   images/  uploads/  audio/  exports/  dailies/  trash/
   films/<id>/film.json         the plan
   films/<id>/takes/<shot>/     every take: frames, latent, conditioning, preview, contact sheet
   library/index.json           what is known about every file
+  library/folders.json         the Library's folders
+  canvas/<id>.json             a board
+  agent/<id>.json              an agent chat
 output/long_video/st_<id>/     the parts of a film, as the long-video nodes keep them
 ```

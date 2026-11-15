@@ -80,14 +80,22 @@ const S = {
   seen: {},                 // job id -> last status, to notice endings
 };
 const ROOMS = {};           // name -> {title, draw(root, arg)}
-// in the order work goes: a film (written, planned, rendered), then finishing it; the single tools stand apart
-const NAV = [
-  ["", [["home", "Home", "◉"]]],
-  ["Make a film", [["writer", "Writer", "✎"], ["films", "Films", "🎬"], ["nightshift", "Night shift", "☾"]]],
+// The top bar: the studios a thing is made in, then the film rooms; everything else is under More.
+const NAV = [["home", "Explore"], ["picture", "Image"], ["video", "Video"], ["audio", "Audio"], ["remix", "Remix", "New"], ["shorts", "Shorts", "New"], "|",
+  ["writer", "Writer"], ["films", "Films"], ["agent", "Agent", "New"], ["canvas", "Canvas"], ["apps", "Apps"]];
+const MORE = [
+  ["Make", [["edit", "Edit a picture", "◩"], ["nightshift", "Night shift", "☾"], ["cast", "Cast library", "☺"]]],
   ["Finish", [["timeline", "Timeline", "═"], ["sound", "Sound", "♪"], ["library", "Library", "▤"]]],
-  ["One picture or clip", [["picture", "Picture", "▣"], ["edit", "Edit a picture", "◩"], ["video", "Video", "▶"], ["apps", "Apps", "▦"]]],
-  ["Studio", [["cast", "Cast library", "☺"], ["machine", "Machine", "⚙"], ["learn", "Learn", "?"]]],
+  ["Studio", [["machine", "Machine", "⚙"], ["learn", "Learn", "?"]]],
 ];
+let QOPEN = false;
+try { QOPEN = localStorage.getItem("h3next.queue") === "1"; } catch (e) { /* private window */ }
+function setQueue(open) {
+  QOPEN = open;
+  try { localStorage.setItem("h3next.queue", open ? "1" : "0"); } catch (e) { /* not remembered */ }
+  document.body.classList.toggle("qopen", open);
+  drawSide();
+}
 
 function go(room, arg, pending) {
   if (pending !== undefined) S.pending = pending;
@@ -103,35 +111,43 @@ function route() {
   const root = $("#room");
   root.replaceChildren();
   root.scrollTop = 0;
-  document.title = ROOMS[S.room].title + " · H3 Studio";
-  try { ROOMS[S.room].draw(root, S.arg); } catch (e) { root.append(h("div", { class: "note bad" }, "This page failed to draw: " + e.message)); console.error(e); }
+  const r = ROOMS[S.room];
+  root.classList.toggle("full", !!(r.full && (typeof r.full !== "function" || r.full(S.arg))));
+  document.title = r.title + " · H3 Studio";
+  try { r.draw(root, S.arg); } catch (e) { root.classList.remove("full"); root.append(h("div", { class: "note bad" }, "This page failed to draw: " + e.message)); console.error(e); }
 }
 window.addEventListener("hashchange", route);
 
+document.addEventListener("click", e => { const p = $(".morepop"); if (p && !p.hidden && !p.contains(e.target)) p.hidden = true; });
+document.addEventListener("keydown", e => { const p = $(".morepop"); if (e.key === "Escape" && p) p.hidden = true; });
 function drawSide() {
-  const gate = S.state.gate.length;
-  const side = $("#side"), was = $(".rooms", side);
-  const rooms = h("div", { class: "rooms" }, NAV.map(([group, items]) => [
-    group ? h("div", { class: "group" }, group) : null,
-    items.map(([id, label, ico]) => h("button", { class: "nav" + (S.room === id ? " on" : ""), onclick: () => go(id), title: label, "aria-current": S.room === id ? "page" : null },
-      h("span", { class: "ico", "aria-hidden": "true" }, ico), h("span", { class: "label" }, label),
-      id === "films" && gate ? h("span", { class: "badge", title: gate + " take(s) at the gate" }, gate) : null)),
-  ]));
-  const top = was ? was.scrollTop : 0;
-  side.replaceChildren(
-    h("div", { class: "brand" },
-      (() => { const s = document.createElementNS("http://www.w3.org/2000/svg", "svg"); s.setAttribute("width", "22"); s.setAttribute("height", "22"); s.setAttribute("viewBox", "0 0 24 24");
-        s.innerHTML = '<rect x="2" y="4" width="20" height="16" rx="3" fill="none" stroke="#e9a53f" stroke-width="2"/><path d="M10 9v6l5-3z" fill="#e9a53f"/>'; return s; })(),
-      h("span", {}, "H3 Studio")),
-    rooms,
-    // below the rooms and not among them: the rooms scroll when the window is short, this switch stays in view
-    h("div", { class: "foot" }, h("button", { class: "nav" + (TERM.open ? " on" : ""), onclick: () => setTerm(!TERM.open), "aria-pressed": TERM.open ? "true" : "false",
-      title: "Show what ComfyUI prints in its terminal, at the bottom of the window" },
-      h("span", { class: "ico", "aria-hidden": "true" }, "❯"), h("span", { class: "label" }, "ComfyUI output"))));
-  rooms.scrollTop = top;
+  const st = S.state, gate = st.gate.length;
+  const live = st.jobs.filter(j => j.status === "running" || j.status === "queued").length;
+  const pop = h("div", { class: "morepop", hidden: true, role: "menu" },
+    MORE.map(([grp, items]) => [h("div", { class: "grp" }, grp), items.map(([id, label, ico]) => h("button", { class: S.room === id ? "on" : "", role: "menuitem",
+      onclick: () => { pop.hidden = true; go(id); } }, h("span", { class: "ico" }, ico), label))]),
+    h("div", { class: "grp" }, "ComfyUI"),
+    h("button", { role: "menuitemcheckbox", "aria-checked": TERM.open ? "true" : "false", onclick: () => { pop.hidden = true; setTerm(!TERM.open); } },
+      h("span", { class: "ico" }, "❯"), (TERM.open ? "Hide" : "Show") + " ComfyUI's output"));
+  const more = h("button", { class: "iconbtn", title: "More", "aria-label": "More rooms", "aria-haspopup": "menu", onclick: e => { e.stopPropagation(); pop.hidden = !pop.hidden; } }, "☰");
+  $("#top").replaceChildren(
+    h("button", { class: "logo", onclick: () => go("home"), "aria-label": "H3 Studio, Explore" },
+      h("span", { class: "mark", "aria-hidden": "true" }, (() => { const s = document.createElementNS("http://www.w3.org/2000/svg", "svg"); s.setAttribute("width", "16"); s.setAttribute("height", "16"); s.setAttribute("viewBox", "0 0 24 24");
+        s.innerHTML = '<path d="M7 5v14l12-7z" fill="#131517"/>'; return s; })()),
+      h("span", { class: "name" }, "H3 Studio"), h("span", { class: "ver" }, "next")),
+    h("nav", { "aria-label": "Rooms" }, NAV.map(x => x === "|" ? h("span", { class: "sep" }) :
+      h("button", { class: "navlink" + (S.room === x[0] ? " on" : ""), "aria-current": S.room === x[0] ? "page" : null, onclick: () => go(x[0]) }, x[1],
+        x[0] === "films" && gate ? h("span", { class: "badge", title: gate + " take(s) at the gate" }, gate) : x[2] ? h("span", { class: "tag" + (x[2] === "New" ? " lime" : "") }, x[2]) : null))),
+    h("div", { class: "right" },
+      h("button", { class: "iconbtn" + (S.room === "library" ? " on" : ""), title: "Library", "aria-label": "Library", onclick: () => go("library") }, "▤"),
+      h("button", { class: "queuebtn" + (live ? " busy" : ""), "aria-pressed": QOPEN ? "true" : "false", title: "The queue: what is rendering", onclick: () => setQueue(!QOPEN) },
+        h("span", { class: "dot " + (st.comfy.up ? (live ? "" : "good") : "bad") }), live ? live + " rendering" : "Queue",
+        gate ? h("span", { class: "badge", title: "at the gate" }, gate) : null),
+      more),
+    pop);
 }
 
-// ---------------------------------------------------------------- the queue, on the right of every room
+// ---------------------------------------------------------------- the queue, a drawer on the right
 function jobCard(j) {
   const p = j.progress || {};
   const live = j.status === "running" || j.status === "queued";
@@ -170,6 +186,8 @@ function drawQueue() {
     seenOut.add(k); return true;
   }).slice(0, 14);
   $("#queue").replaceChildren(
+    h("div", { class: "spread", style: { marginBottom: "10px" } }, h("h2", { style: { margin: 0 } }, "Queue"),
+      h("button", { class: "ghost small", "aria-label": "Close the queue", onclick: () => setQueue(false) }, "✕")),
     h("div", { class: "spread", style: { marginBottom: "12px" } },
       h("div", { class: "pill" }, h("span", { class: "dot " + (st.comfy.up ? "good" : st.comfy.starting ? "warn" : "bad") }),
         st.comfy.up ? "ComfyUI is up" : st.comfy.starting ? "ComfyUI is starting…" : "ComfyUI does not answer"),
@@ -181,7 +199,7 @@ function drawQueue() {
       h("div", { class: "row", style: { marginTop: "6px", gap: "6px" } },
         h("button", { class: "small primary", onclick: () => go("films", g.film + "/roll/" + g.shot) }, "Review"),
         h("button", { class: "small", onclick: async () => { if (await tryApi(`/api/films/${g.film}/approve/${g.shot}`, {})) { toast("Approved"); poll(); } } }, "Approve"))))] : null,
-    h("h3", { style: { marginTop: st.gate.length ? "16px" : "0" } }, "Queue"),
+    h("h3", { style: { marginTop: st.gate.length ? "16px" : "0" } }, "Rendering"),
     live.length ? live.map(jobCard) : h("div", { class: "muted small", style: { marginBottom: "12px" } }, "Nothing is rendering."),
     done.length ? [h("div", { class: "spread", style: { margin: "14px 0 8px" } }, h("h3", { style: { margin: 0 } }, "Finished"),
       h("button", { class: "ghost small", onclick: async () => { await tryApi("/api/jobs/clear", { statuses: ["failed", "cancelled", "done"] }); poll(); } }, "Clear")), done.map(jobCard)] : null);
@@ -202,7 +220,8 @@ async function poll() {
       }
     }
     drawQueue();
-    if (gateChanged) drawSide();
+    const live = st.jobs.filter(j => j.status === "running" || j.status === "queued").length;
+    if (gateChanged || live !== S.live) { S.live = live; drawSide(); }
   } catch (e) {
     $("#queue").replaceChildren(h("div", { class: "note bad" }, "The studio's server does not answer. Start it again with ./run_studio.sh"));
   }
@@ -374,6 +393,7 @@ function md(text) {
 
 async function boot() {
   try { S.presets = await api("/api/presets"); } catch (e) { $("#room").append(h("div", { class: "note bad" }, "The studio's server does not answer: " + e.message)); return; }
+  document.body.classList.toggle("qopen", QOPEN);
   await poll();
   route();
   drawTerm();

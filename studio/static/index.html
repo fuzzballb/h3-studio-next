@@ -3,15 +3,17 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>H3 Studio</title>
+<title>H3 Studio Next</title>
 <link rel="icon" href="/static/icon.svg">
 <link rel="stylesheet" href="/static/app.css">
 </head>
 <body>
 <div id="shell">
-  <nav id="side" aria-label="Rooms"></nav>
-  <main id="room" tabindex="-1"></main>
-  <aside id="queue" aria-label="Queue"></aside>
+  <header id="top"></header>
+  <div id="main">
+    <main id="room" tabindex="-1"></main>
+    <aside id="queue" aria-label="Queue"></aside>
+  </div>
 </div>
 <section id="term" aria-label="ComfyUI output" hidden></section>
 <div id="modal" hidden></div>
@@ -24,6 +26,11 @@
 <script src="/static/library.js"></script>
 <script src="/static/edit.js"></script>
 <script src="/static/studio.js"></script>
+<script src="/static/explore.js"></script>
+<script src="/static/composer.js"></script>
+<script src="/static/remix.js"></script>
+<script src="/static/agent.js"></script>
+<script src="/static/canvas.js"></script>
 <script>boot();</script>
 </body>
 </html>

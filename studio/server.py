@@ -20,7 +20,7 @@ from urllib.parse import unquote
 
 from aiohttp import web
 
-from . import (blockouts, writer, beats, brain, checks, compose, config, films, finish, lengths, library, machine, models, presets, promptcheck,
+from . import (agent, blockouts, canvas, writer, beats, brain, checks, compose, config, films, finish, lengths, library, machine, models, presets, promptcheck,
                work)
 from .comfy import Comfy, ComfyDown, ComfyError
 from .jobs import Queue, Refused
@@ -345,8 +345,60 @@ def asset_view(a):
 async def library_list(request):
     q = request.query
     items = library.search(q.get("q", ""), q.get("kind", ""), q.get("film", ""), trashed=q.get("trashed") == "1",
-                           limit=int(q.get("limit", 400)))
+                           limit=int(q.get("limit", 400)), favorite=q.get("favorite") in ("1", "true"),
+                           folder=q.get("folder", ""), source=q.get("source", ""), surface=q.get("surface", ""),
+                           sort=q.get("sort", "newest"))
     return ok({"items": [asset_view(a) for a in items], "trash": library.trash_size()})
+
+
+@routes.get("/api/library/summary")
+async def library_summary(request):
+    return ok(library.summary())
+
+
+@routes.post("/api/library/bulk")
+async def library_bulk(request):
+    """{ids, action: favorite | unfavorite | move, folder}: all of them, or none when one id is unknown."""
+    d = await body(request)
+    return ok(changed=library.bulk(d.get("ids"), d.get("action"), d.get("folder") or ""))
+
+
+@routes.patch("/api/library/{id}")
+async def library_patch(request):
+    """{favorite, folder, name}: change one file's record."""
+    d = await body(request)
+    a = library.get(request.match_info["id"])
+    if not a:
+        raise KeyError("asset")
+    fields = {}
+    if "favorite" in d:
+        fields["favorite"] = bool(d["favorite"])
+    if "name" in d and str(d["name"]).strip():
+        fields["name"] = str(d["name"]).strip()[:120]
+    if "folder" in d:
+        library.bulk([a["id"]], "move", d.get("folder") or "")
+    return ok(asset_view(library.update(a["id"], **fields) if fields else library.get(a["id"])))
+
+
+@routes.get("/api/folders")
+async def folders_list(request):
+    return ok(library.summary()["folders"])
+
+
+@routes.post("/api/folders")
+async def folders_add(request):
+    return ok(library.add_folder((await body(request)).get("name")))
+
+
+@routes.patch("/api/folders/{id}")
+async def folders_rename(request):
+    return ok(library.rename_folder(request.match_info["id"], (await body(request)).get("name")))
+
+
+@routes.delete("/api/folders/{id}")
+async def folders_delete(request):
+    library.delete_folder(request.match_info["id"])
+    return ok(deleted=True)
 
 
 @routes.get("/api/library/{id}")
@@ -472,6 +524,9 @@ def quick_film(d):
         bible["loras"] = d["loras"]
     name = (d.get("name") or d.get("action") or d.get("prompt") or "Clip").strip()[:48]
     film = films.create(name, quick=True, bible=bible)
+    film["form"] = {k: v for k, v in d.items() if k not in ("looks",)}       # Recreate fills the composer from it
+    if d.get("surface"):
+        film["surface"] = str(d["surface"])[:20]
     cast_ids = []
     for p in d.get("people") or []:
         if not (p.get("name") or "").strip():
@@ -1174,6 +1229,293 @@ async def brain_rewrite(request):
 
 DOCS = {"guide": "docs/guide.md", "prompting": "docs/prompting.md", "tutorial": "docs/tutorial.md", "api": "docs/api.md", "long-video": "docs/long-video.md",
         "readme": "README.md"}
+
+
+# ============================================================================================ estimates
+@routes.post("/api/estimate")
+async def estimate(request):
+    """{kind: "image", takes}: about how many seconds a job takes on this machine (None when nothing is known yet)."""
+    d = await body(request)
+    st = app_of(request)
+    if d.get("kind") == "image":
+        n = max(1, min(int(d.get("takes") or 1), 12))
+        return ok(seconds=st.queue.estimate("image", n, prior=(4.0, 22.0)))
+    raise ValueError("kind is image (a clip's estimate comes with /api/compose)")
+
+
+# ============================================================================================ canvas
+@routes.get("/api/canvas")
+async def canvas_list(request):
+    return ok(canvas.all_boards())
+
+
+@routes.post("/api/canvas")
+async def canvas_new(request):
+    return ok(canvas.create((await body(request)).get("name") or ""))
+
+
+@routes.get("/api/canvas/{id}")
+async def canvas_get(request):
+    b = canvas.load(request.match_info["id"])
+    known = {}
+    for i in b["items"]:
+        if i["type"] == "asset" and i["asset"] not in known:
+            a = library.get(i["asset"])
+            known[i["asset"]] = asset_view(a) if a and not a.get("trashed") else None
+    return ok({**b, "assets": known})
+
+
+@routes.put("/api/canvas/{id}")
+async def canvas_put(request):
+    return ok(canvas.save(request.match_info["id"], await body(request)))
+
+
+@routes.delete("/api/canvas/{id}")
+async def canvas_delete(request):
+    canvas.delete(request.match_info["id"])
+    return ok(deleted=True)
+
+
+# ============================================================================================ the agent
+def _speakers_as_people(lines):
+    names = []
+    for ln in lines or []:
+        n = (ln.get("speaker") or "").strip()
+        if n and n not in names:
+            names.append(n)
+    return [{"name": n, "pronoun": "their", "description": ""} for n in names]
+
+
+def agent_run(st, c, a):
+    """An allowed action becomes a job. Returns the action, changed."""
+    if a["status"] not in ("proposed", "denied", "failed"):
+        raise ValueError("this action already ran")
+    for k in ("error", "made", "job", "progress"):
+        a.pop(k, None)
+    tool = a["tool"]
+    if tool == "make_picture":
+        w, hh = agent.picture_size(a["shape"])
+        j = st.queue.add("image", {"prompt": a["prompt"], "width": w, "height": hh, "takes": a["count"], "surface": "agent"},
+                         title="Picture · " + a["prompt"][:48])
+        a.update(status="queued", job=j["id"])
+    elif tool == "edit_picture":
+        src = library.get(a["asset"])
+        if not src:
+            raise ValueError("that picture is no longer in the Library")
+        j = st.queue.add("image", {"prompt": a["prompt"], "pictures": [config.out_ref(library.abs_path(src))], "keep_size": True,
+                                   "takes": 1, "surface": "agent"}, title="Edit · " + a["prompt"][:48])
+        a.update(status="queued", job=j["id"])
+    elif tool in ("animate_picture", "make_clip"):
+        d = {"action": a["prompt"], "sound": a["sound"], "lines": a["lines"], "people": _speakers_as_people(a["lines"]),
+             "frames": agent.frames_for(a["seconds"]), "surface": "agent", "name": a["prompt"][:48]}
+        if tool == "animate_picture":
+            src = library.get(a["asset"])
+            if not src:
+                raise ValueError("that picture is no longer in the Library")
+            d["first_frame"] = config.out_ref(library.abs_path(src))
+            portrait = (src.get("height") or 0) > (src.get("width") or 1)
+            d["width"], d["height"] = agent.video_size("vertical" if portrait else "landscape")
+        else:
+            d["width"], d["height"] = agent.video_size(a["shape"])
+        film, sh = quick_film(d)
+        j = st.production.queue_shot(film, sh, force=True)
+        a.update(status="queued", job=j["id"], film=film["id"])
+    elif tool == "start_film":
+        conv = writer.new_conversation()
+        a.update(status="running", writer=conv["id"])
+
+        async def write():
+            try:
+                await writer.turn(conv["id"], a["story"])
+                state = "done"
+            except Exception as e:                       # noqa: BLE001 - the chat shows what went wrong
+                state = "failed: " + str(e)[:200]
+            with agent._lock:
+                cc = agent.load(c["id"])
+                aa = agent.find_action(cc, a["id"])
+                aa["status"] = "done" if state == "done" else "failed"
+                if state != "done":
+                    aa["error"] = state[8:]
+                agent.save(cc)
+        asyncio.get_running_loop().create_task(write())
+    return a
+
+
+def agent_view(st, c):
+    """The chat, with each action's job looked up: how far it got and what it made."""
+    changed = False
+    for t in c["turns"]:
+        for a in t.get("actions", []):
+            if not a.get("job") or a["status"] in ("done", "failed", "denied"):
+                continue
+            j = st.queue.get(a["job"])
+            if not j:
+                continue
+            if j["status"] in ("queued", "running"):
+                a["status"] = j["status"]
+                a["progress"] = (j.get("progress") or {}).get("text", "")
+                continue
+            if j["status"] == "done":
+                res = j.get("result") or {}
+                made = list(res.get("assets") or [])
+                if a.get("film"):
+                    f = films.load(a["film"])
+                    if f and f.get("asset"):
+                        made = [f["asset"]]
+                a.update(status="done", made=made)
+            else:
+                a.update(status="failed", error=j.get("error") or j["status"])
+            a.pop("progress", None)
+            changed = True
+    if changed:
+        agent.save(c)
+    out = json.loads(json.dumps(c))
+    for t in out["turns"]:
+        for a in t.get("actions", []):
+            a["assets"] = [asset_view(x) for x in (library.get(i) for i in a.get("made", [])) if x]
+            if a.get("asset"):
+                src = library.get(a["asset"])
+                a["source"] = asset_view(src) if src else None
+    out["writer"] = writer.state()
+    return out
+
+
+@routes.get("/api/agent")
+async def agent_list(request):
+    return ok({"chats": agent.all_chats(), "state": writer.state()})
+
+
+@routes.post("/api/agent")
+async def agent_new(request):
+    this_computer(request)
+    return ok(agent_view(app_of(request), agent.new_chat()))
+
+
+@routes.get("/api/agent/{id}")
+async def agent_get(request):
+    return ok(agent_view(app_of(request), agent.load(request.match_info["id"])))
+
+
+@routes.patch("/api/agent/{id}")
+async def agent_patch(request):
+    d = await body(request)
+    with agent._lock:
+        c = agent.load(request.match_info["id"])
+        if "ask_first" in d:
+            c["ask_first"] = bool(d["ask_first"])
+        if str(d.get("title") or "").strip():
+            c["title"] = str(d["title"]).strip()[:80]
+        agent.save(c)
+    return ok(agent_view(app_of(request), c))
+
+
+@routes.post("/api/agent/{id}/say")
+async def agent_say(request):
+    """{text}: the user's turn. Waits for the answer. With "ask first" off, the actions start straight away."""
+    this_computer(request)
+    st = app_of(request)
+    c = await agent.turn(request.match_info["id"], (await body(request)).get("text") or "")
+    if not c.get("ask_first", True):
+        with agent._lock:
+            c = agent.load(c["id"])
+            for a in c["turns"][-1].get("actions", []):
+                if a["status"] == "proposed":
+                    try:
+                        agent_run(st, c, a)
+                    except (ValueError, KeyError) as e:
+                        a.update(status="failed", error=str(e))
+            agent.save(c)
+    return ok(agent_view(st, c))
+
+
+@routes.post("/api/agent/{id}/act")
+async def agent_act(request):
+    """{action, allow}: run an action the agent proposed, or turn it down."""
+    d = await body(request)
+    st = app_of(request)
+    with agent._lock:
+        c = agent.load(request.match_info["id"])
+        a = agent.find_action(c, str(d.get("action") or ""))
+        if d.get("allow"):
+            agent_run(st, c, a)
+        elif a["status"] == "proposed":
+            a["status"] = "denied"
+        agent.save(c)
+    return ok(agent_view(st, c))
+
+
+@routes.delete("/api/agent/{id}")
+async def agent_delete(request):
+    agent.delete(request.match_info["id"])
+    return ok(deleted=True)
+
+
+# ============================================================================================ shorts
+SHORT_SCHEMA = {"type": "object", "additionalProperties": False, "required": ["title", "look", "place", "people", "beats"], "properties": {
+    "title": {"type": "string"}, "look": {"type": "string"}, "place": {"type": "string"},
+    "people": {"type": "array", "items": {"type": "object", "additionalProperties": False, "required": ["name", "description"],
+                                          "properties": {"name": {"type": "string"}, "description": {"type": "string"}}}},
+    "beats": {"type": "array", "items": {"type": "object", "additionalProperties": False, "required": ["action", "sound", "lines"], "properties": {
+        "action": {"type": "string"}, "sound": {"type": "string"},
+        "lines": {"type": "array", "items": {"type": "object", "additionalProperties": False, "required": ["speaker", "text"],
+                                             "properties": {"speaker": {"type": "string"}, "text": {"type": "string"}}}}}}}}}
+
+
+@routes.post("/api/shorts/plan")
+async def shorts_plan(request):
+    """{idea, parts}: Claude splits one idea into parts of one continuous vertical take. Only text is sent."""
+    this_computer(request)
+    d = await body(request)
+    idea = (d.get("idea") or "").strip()
+    if not idea:
+        raise ValueError("write the idea first")
+    n = max(1, min(int(d.get("parts") or 3), 6))
+    looks = [s["id"] for s in presets.load("looks")["styles"]]
+    system = f"""You plan a short vertical video (9:16) for H3 Studio. It is ONE continuous take made of {n} parts of about
+8.5 seconds; each part after the first continues the one before without a cut (same place, same light, the camera
+goes on). Answer with the JSON object only.
+- "title": a short title. "look": one of {json.dumps(looks)}. "place": the place, as the camera sees it, with its light.
+- "people": everyone in it, with a one-sentence description (age, face, hair, clothes). Invented people only.
+- "beats": exactly {n}, in order. "action": what happens in that part, few actions, with sides (left/right of the picture).
+  A later beat names only what is in view at the end of the beat before. "sound": what is heard besides words.
+  "lines": every spoken word, exact, with the speaker's name; [] when nobody speaks. At most 20 words a part.
+- No text, logos or lettering in the picture. No real people, brands or scenes from existing films or shows."""
+    answer, meta = await writer.run_claude(system, SHORT_SCHEMA, "The idea: " + idea, timeout=300)
+    if not isinstance(answer, dict):
+        raise ValueError("Claude sent no plan; try again")
+    answer["beats"] = (answer.get("beats") or [])[:n]
+    return ok({"plan": answer, "seconds": meta.get("seconds")})
+
+
+@routes.post("/api/shorts")
+async def shorts_make(request):
+    """{plan, size, face, voice}: the plan as a quick film of parts that continue each other, rendered in order."""
+    d = await body(request)
+    st = app_of(request)
+    plan = d.get("plan") or {}
+    beats = [b for b in plan.get("beats") or [] if (b.get("action") or "").strip()]
+    if not beats:
+        raise ValueError("the plan has no parts")
+    w, hh = [int(x) for x in (d.get("size") or "640x1152").split("x")]
+    people = [{"name": p["name"], "pronoun": "their", "description": p.get("description", "")} for p in plan.get("people") or [] if p.get("name")]
+    if people and (d.get("face") or d.get("voice")):
+        people[0]["face"] = d.get("face") or ""
+        people[0]["voice"] = d.get("voice") or ""
+    first = beats[0]
+    film, sh = quick_film({"name": plan.get("title") or "Short", "place": plan.get("place", ""), "action": first["action"],
+                           "sound": first.get("sound", ""), "lines": first.get("lines") or [], "people": people,
+                           "look": plan.get("look") or "cinematic", "width": w, "height": hh, "frames": 209, "surface": "shorts",
+                           "turbo": True, "one_take": True, "notext": True})
+    cast = {c["name"]: c["id"] for c in film["cast"]}
+    for b in beats[1:]:
+        lines = [{"speaker": cast.get(ln.get("speaker"), ln.get("speaker", "")), "text": ln.get("text", ""), "how": ""}
+                 for ln in b.get("lines") or [] if (ln.get("text") or "").strip()]
+        films.new_shot(film, title=b["action"][:48], new_shot=False, mode="fields", cast=list(cast.values()), action=b["action"],
+                       sound=b.get("sound", ""), lines=lines, frames=209)
+    film["form"] = {"short": plan, "size": f"{w}x{hh}"}
+    films.save(film)
+    await st.production.start(film["id"], mode="auto", retries=1)
+    return ok({"film": film["id"], "parts": len(film["shots"])})
 
 
 @routes.get("/api/docs/{name}")

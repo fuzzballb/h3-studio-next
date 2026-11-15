@@ -1,6 +1,6 @@
 # Credits
 
-H3 Studio is glue and judgement around other people's models and nodes. It ships no model weights.
+H3 Studio Next is H3 Studio with a new front end. H3 Studio is glue and judgement around other people's models and nodes. It ships no model weights.
 
 ## What it stands on
 
@@ -22,6 +22,13 @@ or limited by territory.
 
 ## Where ideas came from
 
+- **[Parallax](https://github.com/nickvasilescu/parallax)** by Nick Vasilescu (MIT, Copyright (c) 2026 Nick Vasilescu)
+  for the look of this front end and several of its features: the dark palette with a lime accent, the top bar, the
+  floating composer with chips, studio cards and feature tiles, an Explore feed with Recreate, Remix, Shorts, an agent
+  chat that asks before it spends, a canvas, and a Library with folders and favourites. Everything was written again in
+  plain JavaScript on H3 Studio's API, for local models; no Parallax code, text, logos or pictures are used.
+- **[H3 Studio](https://github.com/fuzzballb/comfyui-h3-studio)**, the repo this one is built on: the whole backend,
+  the film rooms, the checks and the gate.
 - **[Imagination Studio by keys+Wasserman](https://github.com/drowzeys/Imagination-Studio-by-keys-Wasserman)** (Apache-2.0)
   showed what a local film studio around these models can be. Ideas taken from its guides, written again here for
   ComfyUI on one GPU: one-click apps, the prompt check for words that forbid (the model has no negative prompt), the

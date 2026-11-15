@@ -19,6 +19,10 @@ from .jobs import Cancelled, Refused
 HANDLERS = {}
 
 
+
+# what a picture job was asked, kept on each picture so Recreate can fill the form again
+FORM_KEYS = ("prompt", "template", "width", "height", "takes", "seed", "pictures", "angles", "keep_size", "name")
+
 def handler(lane="gpu"):
     def wrap(fn):
         fn.lane = lane
@@ -98,7 +102,8 @@ async def image(job, ctx):
             a = library.add(path, "sheet" if label == "sheet" else "image", prompt=prompt, seed=seed, job=job["id"],
                             name=(p.get("name") or "").strip() or None, view=label or None,
                             film=p.get("film") or None, shot=p.get("shot") or None,
-                            edited_from=pictures[0] if pictures else None)
+                            edited_from=pictures[0] if pictures else None,
+                            form={k: p[k] for k in FORM_KEYS if p.get(k) not in (None, "", [])}, surface=p.get("surface") or None)
             made.append(a)
     ctx.queue.note_time("image", len(plans), time.time() - t0)
     if p.get("film") and p.get("shot"):
@@ -239,7 +244,8 @@ async def shot(job, ctx):
                 a = library.add(full, "clip" if film.get("quick") else "film", name=film["name"], film=film["id"],
                                 film_name=film["name"], prompt=c["prompt"] if film.get("quick") else None,
                                 seed=seed if film.get("quick") else None, quick=bool(film.get("quick")),
-                                ok=review["ok"] if film.get("quick") else None, summary=review["summary"] if film.get("quick") else None)
+                                ok=review["ok"] if film.get("quick") else None, summary=review["summary"] if film.get("quick") else None,
+                                form=film.get("form") if film.get("quick") else None, surface=film.get("surface"))
                 film["asset"] = a["id"]
             films.save(film)
             return film, sh, take, retake

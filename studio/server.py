@@ -8,10 +8,12 @@ Every route answers JSON; an error is {"error": "..."} with status 400 (cannot d
 docs/api.md lists the routes; the MCP server (mcp/studio_mcp.py) is a thin layer over them.
 """
 import asyncio
+import hashlib
 import json
 import mimetypes
 import os
 import re
+import subprocess
 import shutil
 import time
 import traceback
@@ -20,7 +22,7 @@ from urllib.parse import unquote
 
 from aiohttp import web
 
-from . import (agent, blockouts, canvas, writer, beats, brain, checks, compose, config, films, finish, lengths, library, machine, models, presets, promptcheck,
+from . import (agent, blockout_scenes, blockouts, canvas, writer, beats, brain, checks, compose, config, films, finish, lengths, library, machine, models, presets, promptcheck,
                work)
 from .comfy import Comfy, ComfyDown, ComfyError
 from .jobs import Queue, Refused
@@ -88,8 +90,37 @@ class Studio:
         return await self.comfy.object_info()
 
 
+def _build():
+    """Changes when any page file changes: an open page that sees another build was loaded before an update."""
+    h = hashlib.sha1()
+    for d, _, files in sorted(os.walk(config.STATIC)):
+        for f in sorted(files):
+            st = os.stat(os.path.join(d, f))
+            h.update(f"{f}:{st.st_mtime_ns}:{st.st_size};".encode())
+    return h.hexdigest()[:12]
+
+
+_BUILD = {"at": 0.0, "id": ""}
+
+
+def build():
+    """_build(), looked at again at most every 3 s: a page file changed without a restart counts too."""
+    if time.time() - _BUILD["at"] > 3:
+        _BUILD.update(at=time.time(), id=_build())
+    return _BUILD["id"]
+
+
 @web.middleware
 async def guard(request, handler):
+    resp = await _guarded(request, handler)
+    try:
+        resp.headers["X-Studio-Build"] = build()
+    except (AttributeError, RuntimeError):            # a response that is already sent
+        pass
+    return resp
+
+
+async def _guarded(request, handler):
     """Only this computer's own page may call the API, and every failure becomes readable JSON."""
     host = (request.headers.get("Host") or "").rsplit(":", 1)[0].strip("[]")
     allowed = request.app[HOSTS]
@@ -547,7 +578,12 @@ def quick_film(d):
                         last_frame=d.get("last_frame", ""), prompt=d.get("prompt", ""), frames=int(d.get("frames") or 0),
                         seed=int(d.get("seed") or 0), talking_head=bool(d.get("talking_head")),
                         blockout=d.get("blockout", ""), blockout_shapes=d.get("blockout_shapes", ""), blockout_start=int(d.get("blockout_start") or 0), blockout_strength=float(d.get("blockout_strength") or 0))
-    for beat in d.get("beats") or []:
+    cover = compose.blockout_cover(d.get("blockout", "")) if d.get("whole_blockout") and d.get("blockout") else None
+    if cover:                                    # follow the whole blockout: parts that end on its cuts (compose.blockout_parts)
+        parts = compose.blockout_parts(*cover)
+        sh["frames"], sh["blockout_start"] = parts[0]["frames"], parts[0]["start"]
+        add_blockout_parts(film, sh, parts[1:])
+    for beat in ([] if cover else d.get("beats") or []):
         if (beat or "").strip():
             # a long take on a blockout reads on in it: each part starts where the one before stopped (minus the context)
             films.new_shot(film, title=beat.strip()[:48], new_shot=False, mode="fields", cast=cast_ids, action=beat.strip(),
@@ -557,6 +593,114 @@ def quick_film(d):
     return film, sh
 
 
+def add_blockout_parts(film, base, parts):
+    """Shots after `base` that go on following its blockout: the same place, people, action and look; the spoken lines
+    stay in the first part."""
+    keep = {k: base.get(k) for k in films.USER_SHOT_FIELDS
+            if k not in ("title", "new_shot", "lines", "frames", "blockout_start", "first_frame", "last_frame", "seed", "notes")}
+    title = (base.get("title") or "Clip")[:40]
+    n0 = len(film["shots"])
+    for i, p in enumerate(parts):
+        films.new_shot(film, **keep, title=f"{title} · part {n0 + i + 1}", new_shot=p["new_shot"], frames=p["frames"],
+                       blockout_start=p["start"] if p["new_shot"] else 0)
+
+
+PARTS_SYSTEM = """A video is made in parts that each follow one stretch of a rough 3D blockout (grey shapes in Blender
+that set the camera, positions and timing). The person described the whole video in a few words. Write, for each part,
+what happens in that part only: 1 to 3 plain sentences in the present tense, about what is seen in that stretch of the
+blockout (who stands, drives, turns, stops, where to), in the order it happens, and nothing that happens before or after
+it. Work out from the camera keys and the things' keys where the camera is: say for each car or person in view
+whether it comes toward the camera (its front and headlights seen) or drives away from it (its back and tail lights seen),
+and which side of the picture it is on; the grey shapes look alike front and back, so the video model needs these words.
+Use the person's words for what things really are and for the place. No camera moves (the blockout has the
+camera), no spoken words, no titles. Invented people only; no real brands, films, shows or games. Answer with the JSON
+object only: {"parts": [{"action": ...}, ...]}, one per part, in order."""
+PARTS_SCHEMA = {"type": "object", "additionalProperties": False, "required": ["parts"],
+                "properties": {"parts": {"type": "array", "items": {"type": "object", "additionalProperties": False,
+                                                                     "required": ["action"], "properties": {"action": {"type": "string"}}}}}}
+
+
+async def part_actions(action, place, ref, parts):
+    """What happens in each part of a clip that follows a blockout in parts, written by Claude Code from the person's
+    words and the blockout's scene (only text is sent). One description of the whole video in every part made the model
+    squeeze the whole story into each part (2026-11-15). None when Claude is not there or fails: then each part keeps the
+    person's words."""
+    sc = compose.rendered_scene(ref)
+    if not sc or not writer.state()["ok"]:
+        return None
+    small = {"things": [{"name": t["name"], "kind": t["kind"], "color": t.get("color", ""),
+                         "keys": [{"t": k["t"], "at": k["at"], "pose": k["pose"]} for k in t.get("keys") or []]} for t in sc.get("things") or []],
+             "set": [{"type": i["type"], "name": i.get("name", "")} for i in sc.get("set") or []],
+             "camera": [{"t": k["t"], "follows": k.get("follow", ""), "at": k["at"], "cut": k.get("cut", False)} for k in (sc.get("camera") or {}).get("keys") or []]}
+    stretch = [f"part {i + 1}: {p['start'] / 24:.1f} to {(p['start'] + p['frames']) / 24:.1f} s" for i, p in enumerate(parts)]
+    text = (f"The person's words: {action}\nThe place: {place}\n\nThe parts:\n" + "\n".join(stretch)
+            + "\n\nThe blockout scene (metres, seconds; keys say where each thing is at which second):\n" + json.dumps(small)[:50000])
+    try:
+        answer, _ = await writer.run_claude(PARTS_SYSTEM, PARTS_SCHEMA, text, timeout=600)
+    except Exception as e:                           # Claude is optional here: the parts keep the person's words
+        print("part actions: Claude failed:", e)
+        return None
+    got = [(x.get("action") or "").strip() for x in (answer or {}).get("parts") or []]
+    return got if len(got) == len(parts) and all(got) else None
+
+
+async def write_part_actions(fid, first):
+    """Give the shots of clip fid from index `first` on their own actions (see part_actions)."""
+    film = films.load(fid)
+    shots = film["shots"]
+    base = shots[0]
+    parts = []
+    for i in range(len(shots)):
+        pl = compose.blockout_plan(film, i)
+        parts.append({"start": pl["start"], "frames": int(shots[i].get("frames") or 0)})
+    acts = await part_actions(base.get("action", ""), base.get("place", ""), base.get("blockout", ""), parts)
+    if not acts:
+        return False
+    with films.LOCK:
+        film = films.load(fid)
+        for i in range(first, len(film["shots"])):
+            sh = film["shots"][i]
+            if not sh.get("takes"):
+                sh["notes"] = ((sh.get("notes") or "") + "\nThe whole video: " + base.get("action", "")).strip()
+                sh["action"] = acts[i]
+        films.save(film)
+    return True
+
+
+@routes.get("/api/blockout_parts")
+async def blockout_parts_route(request):
+    """?ref=<a blockout video>: how a clip that follows all of it is split ({total, cuts, parts}), or {} when the video
+    is not from the Blockout room."""
+    cover = compose.blockout_cover(request.query.get("ref", ""))
+    if not cover:
+        return ok({})
+    return ok({"total": cover[0], "cuts": cover[1], "parts": compose.blockout_parts(*cover)})
+
+
+@routes.post("/api/clips/{film}/cover_blockout")
+async def clip_cover_blockout(request):
+    """Add the parts a clip needs to follow the rest of its blockout, then render them in order."""
+    with films.LOCK:
+        film = films.load(request.match_info["film"])
+        if not film:
+            raise KeyError("clip")
+        last = film["shots"][-1]
+        cover = compose.blockout_cover(last.get("blockout") or "")
+        if not cover:
+            raise ValueError("this clip does not follow a blockout from the Blockout room")
+        plan = compose.blockout_plan(film, len(film["shots"]) - 1)
+        end = plan["start"] + int(last.get("frames") or 0)
+        parts = compose.blockout_parts(*cover, pos=end, cont=True)
+        if not parts:
+            raise ValueError("the clip already covers its whole blockout")
+        first_new = len(film["shots"])
+        add_blockout_parts(film, last, parts)
+        films.save(film)
+    await write_part_actions(film["id"], first_new)
+    await app_of(request).production.start(film["id"], mode="auto", retries=0)
+    return ok({"film": film["id"], "added": len(parts), "shots": len(film["shots"])})
+
+
 @routes.post("/api/clips")
 async def clips(request):
     """Create > Video: one clip (a quick film with one shot), or a long take when "beats" are given."""
@@ -564,6 +708,8 @@ async def clips(request):
     st = app_of(request)
     film, sh = quick_film(d)
     if len(film["shots"]) > 1:
+        if d.get("whole_blockout"):                  # each part its own stretch of the story (before anything renders)
+            await write_part_actions(film["id"], 0)
         await st.production.start(film["id"], mode="auto", retries=0)
         return ok({"film": film["id"], "shots": len(film["shots"])})
     j = st.production.queue_shot(film, sh, force=True)
@@ -1241,6 +1387,217 @@ async def estimate(request):
         n = max(1, min(int(d.get("takes") or 1), 12))
         return ok(seconds=st.queue.estimate("image", n, prior=(4.0, 22.0)))
     raise ValueError("kind is image (a clip's estimate comes with /api/compose)")
+
+
+# ============================================================================================ blockout room
+@routes.get("/api/blockouts")
+async def blockout_list(request):
+    return ok({"items": blockout_scenes.all_of(), "blender": bool(blockouts.blender()), "sizes": list(blockout_scenes.SIZES)})
+
+
+@routes.post("/api/blockouts")
+async def blockout_new(request):
+    d = await body(request)
+    return ok(blockout_scenes.view(blockout_scenes.create(d.get("name") or "", d.get("scene"), d.get("idea") or "", d.get("size") or "")))
+
+
+@routes.get("/api/blockouts/{id}")
+async def blockout_get(request):
+    b = blockout_scenes.load(request.match_info["id"])
+    making = [j for j in app_of(request).queue.jobs if j.get("kind") == "blockout_free" and j["params"].get("blockout") == b["id"]
+              and j["status"] in ("queued", "running")]
+    return ok({**blockout_scenes.view(b), "job": job_view(making[-1]) if making else None, "write": running_write(b["id"])})
+
+
+@routes.put("/api/blockouts/{id}")
+async def blockout_put(request):
+    d = await body(request)
+    why = d.get("why") if d.get("why") in ("words",) else ""                  # Claude changed it: keep the scene before
+    return ok(blockout_scenes.view(blockout_scenes.save(request.match_info["id"], d, why=why)))
+
+
+@routes.delete("/api/blockouts/{id}")
+async def blockout_delete(request):
+    blockout_scenes.delete(request.match_info["id"])
+    return ok({"deleted": True})
+
+
+def running_write(bid):
+    """The change in words running for this blockout, if any (the page shows its progress after a reload)."""
+    k = next((k for k, t in WRITES.items() if t.get("blockout") == bid and not t["done"]), None)
+    return _write_view(k) if k else None
+
+
+@routes.get("/api/blockouts/{id}/versions")
+async def blockout_versions(request):
+    return ok(blockout_scenes.versions(request.match_info["id"]))
+
+
+@routes.post("/api/blockouts/{id}/versions/{v}")
+async def blockout_restore(request):
+    """Go back to an earlier version; the scene it replaces is kept as a version too."""
+    bid = request.match_info["id"]
+    scene = blockout_scenes.version(bid, request.match_info["v"])
+    return ok(blockout_scenes.view(blockout_scenes.save(bid, {"scene": scene}, why="restore")))
+
+
+@routes.post("/api/blockouts/{id}/make")
+async def blockout_make(request):
+    """Render it in Blender (cpu lane). The video lands in the Library (surface "blockout")."""
+    st = app_of(request)
+    b = blockout_scenes.load(request.match_info["id"])
+    stt = blockout_scenes.state(b)
+    if stt["error"]:
+        raise ValueError("the scene: " + stt["error"])
+    if not stt["blender"]:
+        raise ValueError("Blender was not found on this computer: set its path in Machine → Settings (blender)")
+    j = st.queue.add("blockout_free", {"blockout": b["id"]}, title=f"Blockout · {b['name']} ({stt['seconds']} s)")
+    return ok(job_view(j))
+
+
+def blender_here(request):
+    """Blender opens on the studio's own screen, and only Blender on it may send scenes back."""
+    if (request.remote or "") not in ("127.0.0.1", "::1", "::ffff:127.0.0.1"):
+        raise ValueError("Blender opens on the studio's own computer: use this from the browser there")
+
+
+@routes.post("/api/blockouts/{id}/blender")
+async def blockout_blender(request):
+    """Open the blockout in Blender's own window (blender/blockout_edit.py). What is changed there comes back through
+    /from_blender when the person presses "Send to H3 Studio" or saves."""
+    blender_here(request)
+    b = blockout_scenes.load(request.match_info["id"])
+    stt = blockout_scenes.state(b)
+    if stt["error"]:
+        raise ValueError("fix the scene first: " + stt["error"])
+    exe = blockouts.blender()
+    if not exe:
+        raise ValueError("Blender was not found on this computer: set its path in Machine → Settings (blender)")
+    scene = blockouts.normalize(b["scene"])
+    w, hgt = blockout_scenes.size_of(b)
+    spec = config.home("blockout_scenes", b["id"] + "_edit.json")
+    config.write_json(spec, scene)
+    blend = config.home("blockout_scenes", b["id"] + ".blend")
+    log = open(config.home("blockout_scenes", b["id"] + "_blender.log"), "w")
+    script = os.path.join(os.path.dirname(blockouts.SCRIPT), "blockout_edit.py")
+    subprocess.Popen([exe, "-P", script, "--", spec, str(stt["frames"]), str(w), str(hgt), f"http://{request.host}", b["id"], blend],
+                     stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, start_new_session=True)
+    log.close()
+    return ok({"opened": True, "blend": blend, "blender_at": b.get("blender_at") or 0})
+
+
+@routes.post("/api/blockouts/{id}/from_blender")
+async def blockout_from_blender(request):
+    """{scene}: the scene as Blender read it back from its objects. Saved like an edit in the studio."""
+    blender_here(request)
+    d = await body(request)
+    if not isinstance(d.get("scene"), dict):
+        raise ValueError("send the scene")
+    b = blockout_scenes.save(request.match_info["id"], {"scene": d["scene"]}, blender=True, why="Blender")
+    return ok(blockout_scenes.view(b))
+
+
+WRITES = {}                       # task id → {phase, chars, expect, started, done, result, error, proc}
+
+
+def _write_stats():
+    return config.read_json(config.home("writer", "blockout_write_stats.json")) or {}
+
+
+@routes.post("/api/blockouts/write")
+async def blockout_write(request):
+    """{idea, scene?, size?}: Claude Code writes a blockout scene from words, or changes the scene it is given. Only
+    text is sent. Starts it and answers {task}; GET /api/blockouts/write/{task} shows how far it is and the result."""
+    this_computer(request)
+    d = await body(request)
+    idea = (d.get("idea") or "").strip()
+    if not idea:
+        raise ValueError("say what should happen first")
+    text = "What to make: " + idea[:4000]
+    if d.get("scene"):
+        text += "\n\nThe current scene (change it as asked):\n" + json.dumps(d["scene"])[:60000]
+    if d.get("size"):
+        text += f"\n\nThe video is {d['size']} pixels (width x height)."
+    bid = d.get("blockout") or ""
+    if bid:
+        blockout_scenes.load(bid)                    # it exists
+        running = next((k for k, t in WRITES.items() if t.get("blockout") == bid and not t["done"]), None)
+        if running:                                  # one change at a time: a second click joins the running one
+            return ok(_write_view(running))
+    stats = _write_stats()
+    # about how long the answer is: the scene it changes plus a sentence, or what new scenes were like before
+    # (changes are often longer than the scene they change: a camera that circles gets many keys)
+    expect = int(len(json.dumps(d["scene"])) * (stats.get("grow") or 1.4)) + 200 if d.get("scene") else int(stats.get("new_chars") or 3500)
+    for k in [k for k, t in WRITES.items() if t["done"] and time.time() - t["started"] > 600]:
+        WRITES.pop(k, None)
+    tid = uuid.uuid4().hex[:12]
+    task = WRITES[tid] = {"phase": "starting", "chars": 0, "expect": expect, "started": time.time(), "done": False,
+                          "result": None, "error": "", "typical": stats.get("seconds") or 0,
+                          "blockout": bid, "idea": idea[:4000], "saved": False}
+
+    async def run():
+        try:
+            answer, meta = await writer.run_claude(blockout_scenes.WRITE_SYSTEM, blockout_scenes.WRITE_SCHEMA, text,
+                                                   timeout=900, progress=task)
+            if not isinstance(answer, dict) or not isinstance(answer.get("scene"), dict):
+                raise ValueError("Claude sent no scene; try again")
+            try:
+                blockouts.normalize(answer["scene"])
+                problem = ""
+            except blockouts.BadScene as e:
+                problem = str(e)
+            task["result"] = {"scene": answer["scene"], "say": answer.get("say") or "", "problem": problem, "seconds": meta.get("seconds")}
+            if bid:                                  # saved here, so it is kept even when no page waits for it any more
+                try:
+                    old = blockout_scenes.load(bid)
+                    blockout_scenes.save(bid, {"scene": answer["scene"], "idea": ((old.get("idea") or "") + "\n" + idea).strip()}, why="words")
+                    task["saved"] = True
+                except KeyError:                     # the blockout was deleted meanwhile
+                    pass
+            st = _write_stats()
+            st["seconds"] = round(0.5 * (st.get("seconds") or meta.get("seconds") or 0) + 0.5 * (meta.get("seconds") or 0), 1)
+            if not d.get("scene"):
+                st["new_chars"] = int(0.5 * (st.get("new_chars") or 3500) + 0.5 * len(json.dumps(answer)))
+            else:
+                grow = (task["chars"] or len(json.dumps(answer))) / max(1, len(json.dumps(d["scene"])))
+                st["grow"] = round(min(4.0, max(1.0, 0.5 * (st.get("grow") or 1.4) + 0.5 * grow)), 2)
+            config.write_json(config.home("writer", "blockout_write_stats.json"), st)
+        except Exception as e:                       # shown in the page
+            task["error"] = "Stopped." if task.get("stopped") else str(e) or e.__class__.__name__
+        finally:
+            task["done"] = True
+            task.pop("proc", None)
+    fut = asyncio.ensure_future(run())
+    if not d.get("progress"):          # a page from before progress existed (or a script): wait, answer with the scene
+        await asyncio.shield(fut)
+        if task["error"]:
+            raise ValueError(task["error"])
+        return ok(task["result"])
+    return ok(_write_view(tid))
+
+
+def _write_view(tid):
+    t = WRITES.get(tid)
+    if not t:
+        raise KeyError("task")
+    return {"task": tid, **{k: v for k, v in t.items() if k != "proc"}, "seconds": round(time.time() - t["started"], 1)}
+
+
+@routes.get("/api/blockouts/write/{task}")
+async def blockout_write_state(request):
+    return ok(_write_view(request.match_info["task"]))
+
+
+@routes.delete("/api/blockouts/write/{task}")
+async def blockout_write_stop(request):
+    t = WRITES.get(request.match_info["task"])
+    if not t:
+        raise KeyError("task")
+    t["stopped"] = True
+    p = t.get("proc")
+    if p and p.returncode is None:
+        p.kill()
+    return ok(_write_view(request.match_info["task"]))
 
 
 # ============================================================================================ canvas

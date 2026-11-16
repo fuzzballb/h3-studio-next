@@ -197,6 +197,12 @@ def ref_path(name):
     return os.path.join(INPUT_DIR, name)
 
 
+def out_sub(*parts):
+    """A folder of the studio's data as ComfyUI's output prefix: "studio_next/images" (where SaveImage writes)."""
+    rel = os.path.relpath(os.path.realpath(home(*parts)), os.path.realpath(OUTPUT_DIR))
+    return rel.replace(os.sep, "/")
+
+
 def out_ref(path):
     """A file under output/ as a loader name."""
     rel = os.path.relpath(os.path.realpath(path), os.path.realpath(OUTPUT_DIR))

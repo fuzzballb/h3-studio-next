@@ -203,10 +203,13 @@ def summaries(quick=False):
     root = config.home("films")
     for fid in sorted(os.listdir(root)) if os.path.isdir(root) else []:
         f = load(fid)
-        if not f or bool(f.get("quick")) != bool(quick):
+        if not f:
             continue
         shots = f.get("shots", [])
-        out.append({"id": f["id"], "name": f["name"], "updated": f.get("updated", 0), "shots": len(shots),
+        in_parts = bool(f.get("quick")) and len(shots) > 1        # a clip in several parts is a film too: listed in both
+        if bool(f.get("quick")) != bool(quick) and not (in_parts and not quick):
+            continue
+        out.append({"id": f["id"], "name": f["name"], "clip": bool(f.get("quick")), "updated": f.get("updated", 0), "shots": len(shots),
                     "approved": sum(1 for s in shots if s["status"] == "approved"),
                     "review": sum(1 for s in shots if s["status"] == "review"),
                     "seconds": round(sum(duration_of(s) for s in shots), 1),
@@ -225,7 +228,7 @@ def projects_on_disk():
     """Long-video projects made outside the studio (the story kit, the ComfyUI workflows): [{"project", "parts"}]."""
     mine = set()
     for quick in (False, True):
-        for s in summaries(quick):
+        for s in summaries(quick):                 # (a clip in parts is in both lists; a set keeps it once)
             f = load(s["id"])
             mine.add(f["long_project"])
     out = []

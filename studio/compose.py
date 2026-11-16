@@ -17,6 +17,7 @@ The wording is the one that held up over a 20-part dialogue film (docs/prompting
 Pictures are numbered in the order the model labels them: a first frame, a last frame, then the reference pictures
 (each person's face and outfit sheet, the place, the props that are named, further pictures). Voices are <Audio 1..>.
 """
+import os
 import re
 
 from . import config, lengths, presets, promptcheck
@@ -265,7 +266,9 @@ _FIGURE = {"person": "figure", "child": "small figure", "cyclist": "figure on a 
 
 
 def scene_shapes(scene):
-    """"the blue figure is Mara; the red car is the taxi": what the moving shapes of a made blockout stand for."""
+    """"the blue figure stands for Mara; the red car shape stands for the taxi, with someone at the wheel": what the
+    moving shapes of a made blockout stand for. The colour names the shape, not the real thing (a "white person" was
+    painted as a white mannequin, 2026-11-15)."""
     if not isinstance(scene, dict):
         return ""
     out = []
@@ -273,9 +276,92 @@ def scene_shapes(scene):
         name, kind = (t.get("name") or "").strip(), t.get("kind") or "box"
         if not name or name.lower() == kind:
             continue
-        shape = _FIGURE.get(kind, kind)
-        out.append(f"the {(t.get('color') or '').strip() + ' ' if t.get('color') else ''}{shape} is {name}")
+        shape = _FIGURE.get(kind, kind + " shape")
+        col = (t.get("color") or "").strip()
+        col = "" if col.startswith("#") else col
+        out.append(f"the {col + ' ' if col else ''}{shape} stands for {name}" + (", with someone at the wheel" if t.get("driver") else ""))
     return "; ".join(out)
+
+
+def rendered_scene(ref):
+    """The scene a blockout video was rendered from (the render keeps it as scene.json next to the video), or None."""
+    try:
+        p = os.path.join(os.path.dirname(config.ref_path(ref)), "scene.json")
+        return config.read_json(p) if os.path.isfile(p) else None
+    except (OSError, ValueError):
+        return None
+
+
+def older_blockout(ref):
+    """A warning when a video from the Blockout room is not of its blockout as it is now (the scene changed since)."""
+    m = re.search(r"free_(bo[0-9a-f]+)_([0-9a-f]+)[/\\]blockout\.mp4", config.ref_path(ref))
+    if not m:
+        return ""
+    from . import blockout_scenes
+    try:
+        b = blockout_scenes.load(m.group(1))
+    except KeyError:
+        return ""
+    st = blockout_scenes.state(b)
+    if st["error"] or (st["current"] and m.group(2) == b.get("made")):
+        return ""
+    return (f"this blockout video is older than the blockout \"{b.get('name')}\" is now: the clip follows the old shapes, "
+            "camera and cuts. Render it again in the Blockout room and pick the new video")
+
+
+MAX_PART = 345                      # frames: the longest part the form offers (14.4 s)
+
+
+def blockout_parts(total, cuts, pos=0, cont=False):
+    """How clips cover a blockout of `total` frames that cuts at the frames `cuts`: [{"start", "frames", "new_shot"}].
+
+    Each part is at most MAX_PART frames and ends on one of the blockout's cuts where it can, so the next part opens
+    there as a new shot (the cuts inside a part are named in its prompt). Where no cut is in reach, the next part
+    continues it (a continuation keeps the last lengths.CONTEXT frames of the one before, and reads on in the blockout
+    from there). pos/cont: start after an existing part that covered up to frame pos (cont: continue it)."""
+    out = []
+    cuts = sorted(c for c in cuts if 0 < c < total)
+    guard = 0
+    while total - pos >= 48 and guard < 40:
+        guard += 1
+        back = lengths.CONTEXT if cont else 0
+        reach = MAX_PART - back                                  # how far one part gets past pos
+        if total - pos <= reach:
+            end, at_cut = total, True
+        else:
+            near = [c for c in cuts if pos + 124 - back <= c <= pos + reach]
+            end, at_cut = (near[-1], True) if near else (pos + reach, False)
+        need = end - pos + back
+        ok = [n for n in lengths.usable(cont) if n <= need and n >= (90 if cont else 73)]
+        frames = ok[-1] if ok else min(n for n in lengths.usable(cont) if n >= (90 if cont else 73))
+        out.append({"start": pos - back, "frames": frames, "new_shot": not cont})
+        covered = pos - back + frames
+        if at_cut:
+            if end >= total:
+                break
+            pos, cont = end, False                               # the next part opens on the cut, as a new shot
+        else:
+            pos, cont = covered, True
+    return out
+
+
+def blockout_cover(ref):
+    """(total frames, cut frames) of a video from the Blockout room, from the scene it was made from; None otherwise."""
+    from . import blockouts
+    sc = rendered_scene(ref)
+    if not sc:
+        return None
+    try:
+        total = max(blockouts.scene_frames(blockouts.normalize(sc)), 24)
+    except blockouts.BadScene:
+        return None
+    return total, [round(c * 24) for c in scene_cuts(sc)]
+
+
+def scene_cuts(scene):
+    """The seconds at which a blockout's camera cuts to a new angle."""
+    keys = ((scene or {}).get("camera") or {}).get("keys") or []
+    return sorted(float(k.get("t") or 0) for k in keys if k.get("cut") and float(k.get("t") or 0) > 0)
 
 
 def take_of(film, index):
@@ -333,7 +419,11 @@ def blockout_plan(film, index):
     shapes = (shot.get("blockout_shapes") or "").strip()
     if not shapes and cont and (shots[index - 1].get("blockout") or "") == shot["blockout"]:
         shapes = blockout_plan(film, index - 1)["shapes"]          # the same shapes go on meaning the same things
-    return {"file": shot["blockout"], "start": start, "strength": strength, "shapes": shapes, "scene": None}
+    made_from = rendered_scene(shot["blockout"])                    # a video from the Blockout room: its own scene
+    if not shapes and made_from:
+        shapes = scene_shapes(made_from)
+    return {"file": shot["blockout"], "start": start, "strength": strength, "shapes": shapes, "scene": None,
+            "cuts": scene_cuts(made_from)}
 
 
 def compose(film, shot, index=0, info=None):
@@ -346,6 +436,7 @@ def compose(film, shot, index=0, info=None):
     film = {**film, "bible": bible}
     cont = not (shot.get("new_shot", True) or index == 0)
     findings = []
+    cuts_in = []                    # where the blockout this shot follows cuts, in seconds from the shot's start
     blk = None
     if True:
         shots = list(film.get("shots") or [])
@@ -360,6 +451,9 @@ def compose(film, shot, index=0, info=None):
             findings.append({"level": "note", "code": "blockout-keyframes", "quote": "",
                              "text": "a shot that follows a blockout opens and ends where the blockout does: its first and last frame are not used"})
             shot = {**shot, "first_frame": "", "last_frame": ""}
+        old = blk and older_blockout(blk["file"])
+        if old:
+            findings.append({"level": "warn", "code": "blockout-older", "quote": "", "text": old})
     key, refs, labels = pictures(film, shot, cont)
     cast = [c for c in (_by_id(film.get("cast"), cid) for cid in shot.get("cast") or []) if c]
     lines = [ln for ln in (shot.get("lines") or []) if (ln.get("text") or "").strip()]
@@ -454,8 +548,15 @@ def compose(film, shot, index=0, info=None):
             for c in cast:
                 head.append(person_clause(c, labels, (shot.get("staging") or {}).get(c["id"], "")))
             cam_bits = [b for b in (framing, cam) if b]
-            if take_on:
+            if blk and blk.get("cuts"):                             # the blockout itself cuts within this stretch
+                s0 = blk["start"] / 24
+                n = int(shot.get("frames") or bible.get("frames") or 243)
+                cuts_in = [round(c - s0, 1) for c in blk["cuts"] if s0 < c < s0 + (n / 24 if n else 1e9)]
+            if take_on and not cuts_in:
                 cam_bits.append(TAKE)
+            if cuts_in:                                             # "never cuts" would fight the blockout
+                cam_bits.append("it cuts to a new camera angle exactly where <Video 1> cuts (at "
+                                + ", ".join(f"{c:g} s" for c in cuts_in) + ") and nowhere else")
             if cam_bits:
                 head.append(", ".join(b.rstrip(".") if i == 0 else (b[0].lower() + b[1:]).rstrip(".") for i, b in enumerate(cam_bits)))
         if multi and said:
@@ -534,6 +635,7 @@ def compose(film, shot, index=0, info=None):
             "voices": voices, "pictures": labels, "audios": audios,
             "lines": [{"speaker": _speaker_name(film, ln.get("speaker")), "text": ln["text"].strip(), "how": ln.get("how", "")} for ln in lines],
             "loras": loras, "frames": frames, "continuation": cont, "asks_for_cut": "[Shot 2]" in prompt,
+            "blockout": bool(blk), "blockout_cuts": cuts_in,
             "width": int(bible["width"]), "height": int(bible["height"]), "turbo": bool(bible.get("turbo", True)),
             "unet": bible.get("unet") or "", "language": bible.get("language") or "English", "blockout": blk,
             "findings": findings}

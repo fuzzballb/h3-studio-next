@@ -14,6 +14,8 @@ H3 Studio Next is H3 Studio with a new front end. H3 Studio is glue and judgemen
 | [ComfyUI-KJNodes](https://github.com/kijai/ComfyUI-KJNodes) | kijai | Low-VRAM attention, chunked feed-forward, previews, sharpening. |
 | [TTS Audio Suite](https://github.com/diodiogod/TTS-Audio-Suite) with ChatterBox | diodiogod; Resemble AI | Voice-over. |
 | [openai-whisper](https://github.com/openai/whisper) | OpenAI | Hearing what a clip says, for the speech check and captions. |
+| [three.js](https://threejs.org) 0.170.0 | the three.js authors (MIT) | The Blockout room's 3D view. Bundled in `studio/static/vendor/` with its licence. |
+| Blender | the Blender Foundation | Renders blockouts (installed separately). |
 | FFmpeg | the FFmpeg developers | Every check, cut, export and sheet. |
 | FILM | Google Research | Frame interpolation to 48 fps. |
 

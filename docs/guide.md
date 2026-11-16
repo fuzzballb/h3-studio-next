@@ -47,6 +47,33 @@ what else is heard, and **Place** is where it happens. **+** starts the clip fro
 **Full form** opens everything else: people with faces, outfits and voice samples, reference pictures, a blockout to
 follow, a long take that continues a clip, or one shot in several looks.
 
+## Blockout
+
+![The Blockout editor: the scene list, the 3D view with paths and the camera, and the panel of the selected thing](img/next/blockout.jpg)
+
+For shots that words cannot hold: a camera that circles or follows, a car that stops and turns, people placed
+exactly. Describe the shot and Claude Code builds the scene, or start from a street and build it yourself.
+
+- **Left:** the scene, the camera, the things that move and the set. **+ Add** puts a new one in the middle of the view.
+- **The 3D view:** drag to look around, right-drag to slide, the wheel to zoom. Drag a thing to move it: at the
+  moment on the timeline it gets a key there. Between keys it moves smoothly (the white line is its path; the dashed
+  orange line is the camera's).
+- **Through the camera** shows exactly what the video will frame, at the size of the video.
+- **Cars** come as a saloon, coupe, sports car, SUV or pickup, with see-through windows. Pick a **Driver** for a car
+  and someone sits at the wheel, seen through the windows. Blender and the 3D view build them from the same
+  `studio/static/car_shapes.json` (made by `studio/blender/make_car_shapes.py`).
+- **The camera:** look around in the free view until it shows the shot, then **Set the camera to my view**. Each key
+  can follow a thing by name, and **Cut here** jumps to a new angle.
+- **Change it in words** asks Claude Code to change the scene ("make the camera circle her"). Ctrl+Z undoes anything.
+- **Edit in Blender** opens the scene in Blender's own window. Every set piece and moving thing is one object, and its
+  keys are keyframes. The camera is "Camera" and looks at "Camera aim". Move, turn and scale things, or insert keys (I)
+  at other frames. Then press **Send to H3 Studio** in Blender's sidebar (N → H3 Studio), or save with Ctrl+S, and the
+  studio's view follows. Poses, kinds and colours are changed in the studio. Plain meshes you add in Blender come back
+  as boxes.
+- **Render the blockout** makes the grey video in Blender, and **Use in a video** opens the Video form with it.
+
+![Through the camera, at the size of the video](img/next/blockout-camera.jpg)
+
 ## Remix
 
 ![Remix: one picture, a direction, as many takes as you like](img/next/remix.jpg)

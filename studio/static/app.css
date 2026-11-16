@@ -95,7 +95,7 @@ input[type=number] { width: 110px; }
 input[type=range] { accent-color: var(--accent); padding: 0; background: none; border: 0; }
 label { display: block; color: var(--muted); font-size: 12.5px; margin: 0 0 5px; }
 .field { margin: 0 0 14px; min-width: 0; }
-.field .hint { color: var(--faint); font-size: 12px; margin-top: 4px; }
+.field .hint, .hint { color: var(--faint); font-size: 12px; margin-top: 4px; }
 .check { display: flex; align-items: center; gap: 8px; color: var(--text); font-size: 14px; margin: 0 0 10px; cursor: pointer; }
 .row { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
 .row > .field { flex: 1 1 160px; }
@@ -448,3 +448,75 @@ body.term-drag { cursor: ns-resize; user-select: none; }
 .libside .lbl { color: var(--faint); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; padding: 14px 10px 4px; display: flex; justify-content: space-between; align-items: center; }
 .libside .meter { margin-top: 14px; padding: 10px; border-radius: 12px; background: var(--panel2); font-size: 12px; color: var(--muted); }
 .selbar { position: sticky; top: 0; z-index: 4; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; background: var(--panel3); border: 1px solid var(--line2); border-radius: 14px; padding: 8px 10px; margin-bottom: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.4); }
+
+/* the full video form, as numbered steps */
+.stephead { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 14px; }
+.stephead h3 { margin: 0; display: flex; align-items: center; gap: 8px; }
+.stephead p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+.num { flex: none; width: 26px; height: 26px; border-radius: 50%; background: var(--accent); color: var(--accent-ink); font-weight: 700; font-size: 13px;
+  display: inline-flex; align-items: center; justify-content: center; }
+.opt { font-size: 11px; font-weight: 500; color: var(--faint); border: 1px solid var(--line2); border-radius: 99px; padding: 1px 8px; text-transform: lowercase; }
+.explained { margin: 10px 0; } .explained .hint { margin: 2px 0 0 26px; }
+.howto summary, .more > summary { cursor: pointer; font-weight: 600; }
+.more > summary { display: flex; align-items: center; gap: 10px; list-style: none; }
+.more > summary::-webkit-details-marker { display: none; }
+.howto ol { margin: 10px 0 0; padding-left: 20px; color: var(--soft); line-height: 1.55; } .howto li { margin-bottom: 4px; }
+.row.top { align-items: flex-start; }
+.more > summary .muted { font-weight: 400; }
+
+/* Blockout room: outline | 3D view + timeline | inspector */
+.bosteps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 18px 0; max-width: 980px; }
+.bosteps .card { margin: 0; } .bosteps b { display: block; margin: 8px 0 4px; } .bosteps p { margin: 0; }
+@media (max-width: 800px) { .bosteps { grid-template-columns: 1fr 1fr; } }
+.boardcard .prev.one { display: flex; align-items: center; justify-content: center; background-size: cover; background-position: center; }
+.bo { flex: 1; min-height: 0; display: grid; grid-template-columns: 230px minmax(0, 1fr) 340px; }
+.boleft, .boright { overflow-y: auto; padding: 12px; background: var(--panel); }
+.boleft { border-right: 1px solid var(--line); } .boright { border-left: 1px solid var(--line); }
+.boright .card { margin: 12px 0 0; }
+.bocenter { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.boview { position: relative; flex: 1; min-height: 0; background: #000; }
+.bocanvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; outline: none; cursor: grab; touch-action: none; }
+.bocanvas:active { cursor: grabbing; }
+.boframe-label { position: absolute; left: 12px; top: 10px; font-size: 12px; color: var(--muted); pointer-events: none; }
+.botimeline { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-top: 1px solid var(--line); background: var(--panel); }
+.boslidewrap { position: relative; flex: 1; }
+.boslider { width: 100%; accent-color: var(--accent); }
+.boticks { position: absolute; left: 0; right: 0; top: -6px; height: 0; pointer-events: none; }
+.botick { position: absolute; width: 9px; height: 9px; padding: 0; min-height: 0; border-radius: 2px; transform: translateX(-50%) rotate(45deg); pointer-events: auto; border: 0; }
+.botick.lime { background: var(--accent); } .botick.orange { background: #ff9d3c; }
+.botime { font-variant-numeric: tabular-nums; min-width: 52px; text-align: right; }
+.bolist { display: flex; flex-direction: column; gap: 2px; }
+.borow { display: flex; gap: 10px; align-items: flex-start; text-align: left; background: transparent; border: 1px solid transparent; padding: 7px 8px; border-radius: var(--radius-s); width: 100%; }
+.borow small { display: block; color: var(--muted); font-size: 11.5px; font-weight: 400; }
+.borow:hover { background: var(--panel2); } .borow.on { background: var(--accent-soft); border-color: var(--accent-chip); }
+.boicon { color: var(--muted); width: 14px; flex: none; }
+.bohead { display: flex; justify-content: space-between; align-items: center; margin: 14px 0 4px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); position: relative; }
+.bonone { padding: 4px 8px 8px; }
+.bopop { position: relative; z-index: 20; max-height: 340px; overflow-y: auto; display: flex; flex-direction: column; margin: 4px 0 8px; }
+.bopop button { text-align: left; }
+.boinspect h3 { margin-top: 0; } .boinspect h4 { margin: 14px 0 4px; }
+.bovec { display: flex; gap: 6px; } .bovec label { flex: 1; display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); }
+.bovec label span { width: 12px; } .bonum { width: 100%; min-width: 0; padding: 6px 7px; }
+.bokeys { width: 100%; border-collapse: collapse; font-size: 12px; }
+.bokeys th { text-align: left; color: var(--faint); font-weight: 500; padding: 2px; }
+.bokeys td { padding: 2px; } .bokeys select { padding: 5px 4px; font-size: 12px; } .bokeys tr.now td { background: var(--accent-soft); }
+.bokeys button { padding: 2px 6px; min-height: 0; }
+.bocamkey { border: 1px solid var(--line); border-radius: var(--radius-s); padding: 8px 10px; margin-bottom: 8px; }
+.bocamkey.now { border-color: #ff9d3c; }
+@media (max-width: 1100px) { .bo { grid-template-columns: 1fr; grid-auto-rows: auto; } .boview { min-height: 55vh; } }
+.bokeys { table-layout: fixed; } .bokeys input, .bokeys select { width: 100%; padding: 4px 5px; font-size: 12px; }
+.bokeys td:last-child { white-space: nowrap; }
+.bocolor { display: flex; gap: 6px; } .bocolor select { flex: 1; min-width: 0; }
+.bocolor input[type=color] { width: 40px; height: 36px; padding: 2px; border-radius: 8px; flex: none; background: var(--field); border: 1px solid var(--line2); }
+.bovec label { min-width: 0; }
+.boblender { padding: 10px 14px; background: rgba(255,157,60,.12); border-bottom: 1px solid rgba(255,157,60,.4); font-size: 13px; line-height: 1.5; }
+.boblender button { margin-left: 8px; }
+.boprog { margin-top: 10px; padding: 10px 12px; border: 1px solid var(--line, #2a2d33); border-radius: 10px; background: rgba(255,255,255,.03); }
+.boprog .spread { align-items: center; }
+.bobar { height: 6px; margin: 8px 0 6px; border-radius: 3px; background: rgba(255,255,255,.08); overflow: hidden; }
+.bobar i { display: block; height: 100%; width: 3%; background: var(--accent, #d4ff3a); border-radius: 3px; transition: width .6s ease; }
+.stalebar { position: sticky; top: 0; z-index: 1000; display: flex; gap: 12px; align-items: center; justify-content: center; padding: 10px 16px; background: #5a3a00; color: #fff; font-size: 14px; }
+.boversions { display: grid; gap: 6px; margin-top: 8px; max-height: 260px; overflow: auto; }
+.boversions .spread { gap: 8px; align-items: center; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; }
+.cliplive .card { margin: 10px 0; }
+.cliplive .job { margin: 0; }

@@ -22,11 +22,12 @@ ROOMS.films = { title: "Films", draw(root, arg) {
         h("div", { class: "field fit" }, h("button", { onclick: async e => { e.target.disabled = true; toast("Reading the parts…"); const f = await tryApi("/api/films/adopt", a); e.target.disabled = false; if (f) go("films", f.id + (f.story ? "/shots" : "/roll")); } }, "Open as a film"))),
       h("div", { class: "hint muted small" }, "A story file is a program; it is run to be read, like the story kit does."))); }).catch(() => {});
   api("/api/films").then(fs => list.replaceChildren(fs.length ? fs.map(f => h("div", { class: "card", style: { margin: 0 } },
-    h("div", { class: "spread" }, h("h2", { style: { margin: 0 } }, f.name), f.running ? h("span", { class: "chip accent" }, "rendering") : f.review ? h("span", { class: "chip warn" }, f.review + " at the gate") : null),
-    h("p", { class: "muted small", style: { margin: "6px 0 10px" } }, f.logline || "No logline yet."),
+    h("div", { class: "spread" }, h("h2", { style: { margin: 0 } }, f.name), f.clip ? h("span", { class: "chip" }, "clip from Video") : null, f.running ? h("span", { class: "chip accent" }, "rendering") : f.review ? h("span", { class: "chip warn" }, f.review + " at the gate") : null),
+    h("p", { class: "muted small", style: { margin: "6px 0 10px" } }, f.logline || (f.clip ? "Made in Video in parts; its own page shows the whole clip." : "No logline yet.")),
     h("div", { class: "muted small" }, `${f.shots} shots · ${f.approved} approved · ${secs(f.seconds)} · ${ago(f.updated)}`),
     h("div", { class: "small", style: { marginTop: "6px" } }, f.next ? [h("b", {}, `Next: ${f.next.n} · ${f.next.label}`), f.next.todo ? h("span", { class: "muted" }, " — " + f.next.todo) : null] : h("span", { class: "good" }, "✓ Finished")),
-    h("div", { class: "row", style: { marginTop: "10px", gap: "6px" } }, h("button", { class: "primary small", onclick: () => go("films", f.id + (f.next ? "/" + f.next.id : "")) }, f.next ? "Go on" : "Open"),
+    h("div", { class: "row", style: { marginTop: "10px", gap: "6px" } }, f.clip ? h("button", { class: "primary small", onclick: () => go("video", "clip/" + f.id) }, "Open the clip") : null,
+      h("button", { class: f.clip ? "small" : "primary small", onclick: () => go("films", f.id + (f.next ? "/" + f.next.id : "")) }, f.clip ? "Open as a film" : f.next ? "Go on" : "Open"),
       h("button", { class: "small danger", onclick: async () => { if (!confirm(`Move “${f.name}” and its renders to the trash?`)) return; if (await tryApi("/api/films/" + f.id, undefined, "DELETE")) { toast("Moved to the trash"); route(); } } }, "Delete"))))
     : h("div", { class: "empty", style: { gridColumn: "1 / -1" } }, "No films yet."))).catch(e => toast(e.message, true));
 } };
@@ -120,8 +121,9 @@ async function drawFilm(root, arg) {
       field("Looks like", text(c, "description", { rows: 2, oninput: edited, placeholder: "a woman in her early thirties with a soft oval face and shoulder-length wavy dark hair; she wears a yellow sweater" }),
         "With a face picture, describe only what should differ from it. Clothes that are not in a picture are described here."),
       h("div", { class: "row" },
-        h("div", { class: "field" }, h("label", {}, "Face"), refPicker(c, "face", { onchange: edited, empty: "a tight face crop", makeLabel: "Invent one", make: () => go("picture", "", { template: "portrait", width: 1024, height: 1024, takes: 3 }) })),
-        h("div", { class: "field" }, h("label", {}, "Outfit sheet"), refPicker(c, "body", { onchange: edited, empty: "whole body, several views", makeLabel: "From the face", make: () => c.face ? go("edit", "", { picture: c.face, angles: "sheet" }) : toast("Pick the face first", true) })),
+        h("div", { class: "field" }, h("label", {}, "Face"), refPicker(c, "face", { onchange: edited, empty: "a tight face crop", makeLabel: "Invent one", make: () => go("picture", "", { template: "portrait", width: 1024, height: 1024, takes: 3, prompt: [c.name, c.description].filter(Boolean).join(": "),
+          back: ["films", film.id + "/cast"], backLabel: "the cast of " + film.name }) })),
+        h("div", { class: "field" }, h("label", {}, "Outfit sheet"), refPicker(c, "body", { onchange: edited, empty: "whole body, several views", makeLabel: "From the face", make: () => c.face ? go("edit", "", { picture: c.face, angles: "sheet", back: ["films", film.id + "/cast"], backLabel: "the cast of " + film.name }) : toast("Pick the face first", true) })),
         h("div", { class: "field" }, h("label", {}, "Voice sample"), refPicker(c, "voice", { kind: "audio", onchange: edited, empty: "10–20 s of clean speech" }))),
       h("div", { class: "row" },
         h("div", { class: "field" }, h("label", {}, "Person LoRA"), (() => { c.lora = c.lora || {}; return select(c.lora, "file", [["", "(none)"], ...[...new Set([c.lora.file, ...machine.loras].filter(Boolean))].map(l => [l, l])], { onchange: edited }); })()),
@@ -130,13 +132,14 @@ async function drawFilm(root, arg) {
       h("div", { class: "row" }, h("div", { class: "field" }, h("label", {}, "Name"), text(l, "name", { oninput: edited })),
         h("div", { class: "field fit" }, h("button", { class: "ghost small", onclick: () => { film.locations.splice(i, 1); edited(); draw(); } }, "Remove"))),
       field("The place", text(l, "description", { rows: 3, oninput: edited, placeholder: "A narrow street-food alley at night: red paper lanterns above, a small open noodle bar with a steel counter and round stools, wet pavement. Other customers sit on some of the stools; they stay in the background." })),
-      field("Plate (an empty picture of the place)", refPicker(l, "plate", { onchange: edited, empty: "the same plate in every new shot keeps the place the same", makeLabel: "Make one", make: () => go("picture", "", { template: "location", width: 1440, height: 800, takes: 3 }) })));
+      field("Plate (an empty picture of the place)", refPicker(l, "plate", { onchange: edited, empty: "the same plate in every new shot keeps the place the same", makeLabel: "Make one", make: () => go("picture", "", { template: "location", width: 1440, height: 800, takes: 3, prompt: [l.name, l.description].filter(Boolean).join(": "),
+          back: ["films", film.id + "/cast"], backLabel: "the places of " + film.name }) })));
     const prop = (p, i) => h("div", { class: "person" },
       h("div", { class: "row" }, h("div", { class: "field" }, h("label", {}, "Name"), text(p, "name", { oninput: edited, placeholder: "the dark futuristic car" })),
         h("div", { class: "field" }, h("label", {}, "Token to write in a shot"), text(p, "token", { oninput: edited, placeholder: "<CAR>", mono: true })),
         h("div", { class: "field fit" }, h("button", { class: "ghost small", onclick: () => { film.props.splice(i, 1); edited(); draw(); } }, "Remove"))),
-      field("Sheet", refPicker(p, "sheet", { onchange: edited, empty: "the thing on white, two views", makeLabel: "Make one", make: () => go("edit", "", { template: "propsheet" }) }),
-        "Write “the car from " + (p.token || "<CAR>") + "” in a shot: the token becomes its Picture number, and the sheet is attached only to shots that name it."));
+      field("Sheet", refPicker(p, "sheet", { onchange: edited, empty: "the thing on white, two views", makeLabel: "Make one", make: () => go("picture", "", { template: "prop", width: 1024, height: 1024, takes: 2, prompt: "Product photo of " + (p.name || "the object") + ", alone on a plain white background, soft studio light, the whole object in frame.", back: ["films", film.id + "/cast"], backLabel: "the cast of " + film.name }) }),
+        "Make one: a photo of the thing, then attach it and choose Prop sheet. Write “the car from " + (p.token || "<CAR>") + "” in a shot: the token becomes its Picture number, and the sheet is attached only to shots that name it."));
     return h("div", {},
       h("div", { class: "spread" }, h("h2", {}, "Cast"), h("div", { class: "row", style: { gap: "6px" } },
         h("button", { class: "small", onclick: async () => { const lib = await tryApi("/api/cast"); if (!lib) return; if (!lib.length) return toast("The cast library is empty. Save a character to it first."); pickFromCast(lib); } }, "From the cast library"),

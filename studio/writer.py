@@ -134,7 +134,8 @@ def all_conversations():
         for f in os.listdir(_dir()):
             if f.endswith(".json"):
                 c = config.read_json(os.path.join(_dir(), f), None)
-                if c:
+                if isinstance(c, dict) and isinstance(c.get("turns"), list) and c.get("id"):   # other files live here too
+                                                                                                # (blockout_write_stats.json)
                     first = next((t["text"] for t in c["turns"] if t["role"] == "user"), "")
                     out.append({"id": c["id"], "film": c.get("film", ""), "title": c.get("title") or first[:70],
                                 "updated": c.get("updated", 0), "turns": len(c["turns"])})
@@ -212,28 +213,37 @@ def state():
             "why": "" if exe else "the claude command is not installed or not on the PATH of the studio"}
 
 
-async def run_claude(system, schema, text, timeout=TIMEOUT):
+async def run_claude(system, schema, text, timeout=TIMEOUT, progress=None):
     """One turn of Claude Code with no tools: `text` in, the JSON object that fits `schema` out. Also used by the
-    agent chat and the Shorts planner. Returns (answer, meta); answer is None when Claude sent plain text instead."""
+    agent chat and the Shorts planner. Returns (answer, meta); answer is None when Claude sent plain text instead.
+    progress: a dict kept up to date while Claude works (Claude's answer is streamed): "phase" (starting, thinking,
+    writing), "chars" (of the answer written so far) and "proc" (the running program, to stop it)."""
     st = state()
     if not st["ok"]:
         raise ValueError("this needs Claude Code: " + st["why"])
     work = config.home("writer", "workdir")                # an empty folder: nothing of this computer is read
     os.makedirs(work, exist_ok=True)
     env = {k: v for k, v in os.environ.items() if not k.startswith(("CLAUDE", "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"))}
-    args = [st["command"], "-p", "--output-format", "json", "--json-schema", json.dumps(schema), "--system-prompt", system,
+    fmt = ["stream-json", "--verbose", "--include-partial-messages"] if progress is not None else ["json"]
+    args = [st["command"], "-p", "--output-format", *fmt, "--json-schema", json.dumps(schema), "--system-prompt", system,
             "--tools", "", "--safe-mode", "--strict-mcp-config", "--no-session-persistence", "--disable-slash-commands"]
     if st["model"]:
         args += ["--model", st["model"]]
     t0 = time.time()
     proc = await asyncio.create_subprocess_exec(*args, cwd=work, env=env, stdin=asyncio.subprocess.PIPE,
-                                                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+                                                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, limit=32 << 20)
     try:
-        out, err = await asyncio.wait_for(proc.communicate(text.encode()), timeout)
+        if progress is None:
+            out, err = await asyncio.wait_for(proc.communicate(text.encode()), timeout)
+            raw = out.decode("utf-8", "replace").strip()
+        else:
+            progress.update(phase="starting", chars=0, proc=proc)
+            raw, err = await asyncio.wait_for(_streamed(proc, text, progress), timeout)
     except asyncio.TimeoutError:
         proc.kill()
         raise ValueError(f"Claude gave no answer within {timeout // 60} minutes")
-    raw = out.decode("utf-8", "replace").strip()
+    if progress is not None and progress.get("stopped"):
+        raise ValueError("stopped")
     try:
         res = json.loads(raw)
     except ValueError:
@@ -251,6 +261,40 @@ async def run_claude(system, schema, text, timeout=TIMEOUT):
     meta = {"seconds": round(time.time() - t0, 1), "model": ",".join((res.get("modelUsage") or {}).keys()),
             "cost_usd": res.get("total_cost_usd"), "text": res.get("result") or ""}
     return answer, meta
+
+
+async def _streamed(proc, text, progress):
+    """Read Claude Code's stream-json output, keep `progress` up to date, and return (the result line, stderr)."""
+    proc.stdin.write(text.encode())
+    await proc.stdin.drain()
+    proc.stdin.close()
+    err_task = asyncio.ensure_future(proc.stderr.read())
+    result = ""
+    while True:
+        line = await proc.stdout.readline()
+        if not line:
+            break
+        try:
+            e = json.loads(line)
+        except ValueError:
+            continue
+        kind = e.get("type") if isinstance(e, dict) else None
+        if kind == "stream_event":
+            ev = e.get("event") or {}
+            block = ev.get("content_block") or {}
+            delta = ev.get("delta") or {}
+            if ev.get("type") == "content_block_start" and block.get("type") == "thinking":
+                progress["phase"] = "thinking"
+            elif ev.get("type") == "content_block_start" and block.get("type") in ("tool_use", "text"):
+                progress["phase"] = "writing"
+            elif delta.get("type") == "input_json_delta":
+                progress["chars"] += len(delta.get("partial_json") or "")
+            elif delta.get("type") == "text_delta":
+                progress["chars"] += len(delta.get("text") or "")
+        elif kind == "result" or isinstance(e, list):
+            result = line.decode("utf-8", "replace").strip()
+    await proc.wait()
+    return result, await err_task
 
 
 async def ask(c):

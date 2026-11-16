@@ -67,6 +67,7 @@ ROOMS.home = { title: "Explore", draw(root) {
     ["remix", "⟳", "Remix", "One picture in, as many moving takes as you like.", "New"],
     ["shorts", "▯", "Shorts", "One idea becomes a vertical video in one take.", "New"],
     ["agent", "✦", "Agent", "A chat that plans and makes things for you.", "New"],
+    ["blockout", "⬚", "Blockout", "Sketch a shot in 3D: the set, who moves where, the camera.", "New"],
     ["canvas", "▦", "Canvas", "A board for pictures, clips and notes.", "New"],
     ["audio", "♪", "Audio", "Voice-overs and voice samples for your cast.", ""],
     ["nightshift", "☾", "Night shift", "Leave a film rendering while you sleep.", ""],

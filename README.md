@@ -24,6 +24,7 @@ canvas and a fuller Library. The backend (films, blockouts, the Writer, the chec
 | **Explore** | The home page: the three studios, the newer tools, your films in progress and a feed of everything made here. Hover a post to see its prompt; **Recreate** opens the page it was made on with its settings filled in. ☆ makes it a favourite. |
 | **Image** | A floating prompt bar with chips: what to make (picture, face, place, edit, other angles, outfit sheet, prop sheet), size, takes, seed. **+** attaches pictures to edit. The Generate button shows about how long it takes on this machine. |
 | **Video** | The same bar for MiniMax H3: look, camera move, framing, size, length, turbo, the exact spoken lines, sound, place. **+** starts from a first frame (and a last). **Full form** has everything else: people with faces, outfits and voices, reference pictures, blockouts, long takes, several looks. |
+| **Blockout** | A rough 3D sketch of a shot: set pieces, people and vehicles that move along keys, and a camera path. Build it in a 3D editor (drag things in the view, a timeline sets when, "Set the camera to my view"), or describe it and Claude Code writes the scene. **Edit in Blender** opens it in Blender's own window, and what you change there comes back. Play it from anywhere or through the camera, render it in Blender, then **Use in a video**: a clip keeps its camera, positions and timing and the model paints the real thing over it. |
 | **Audio** | Words spoken by ChatterBox in a voice from the TTS Audio Suite; voice samples for characters. |
 | **Remix** | One picture plus a direction gives a moving take; as many takes as you like. Nine directions to start from (slow push in, half orbit, comes to life, rain starts…) or your own words. Standard (turbo) or Pro (all steps). |
 | **Shorts** | One idea becomes a vertical video in one continuous take: Claude Code splits it into 2 to 5 parts, you change any of them, and the parts render in order, each continuing the one before. |
@@ -37,7 +38,7 @@ canvas and a fuller Library. The backend (films, blockouts, the Writer, the chec
 The queue is a drawer on the right (the **Queue** button in the top bar); it shows what is rendering and the takes
 waiting at the gate.
 
-Only text ever leaves the computer, and only for the Writer, the Agent and the Shorts planner: they run the Claude Code
+Only text ever leaves the computer, and only for the Writer, the Agent, the Shorts planner and the Blockout writer: they run the Claude Code
 program that is signed in on this computer (`claude -p`, no tools), so they use that subscription. Pictures, clips and
 sound are made by your ComfyUI and stay on your disk.
 
@@ -50,7 +51,7 @@ with an RTX 3090 (24 GB) and 62 GB RAM.
    long-video manual. The long-video nodes themselves come from
    [comfyui-h3-long-video](https://github.com/fuzzballb/comfyui-h3-long-video) or
    [comfyui-h3-studio](https://github.com/fuzzballb/comfyui-h3-studio) in `custom_nodes`; this repo has no ComfyUI
-   nodes of its own. Optional: TTS Audio Suite, `openai-whisper` in ComfyUI's Python, Blender for blockouts,
+   nodes of its own. Optional: TTS Audio Suite, `openai-whisper` in ComfyUI's Python, Blender for rendering blockouts (found on the PATH or set in Machine → Settings),
    Claude Code for the Writer, the Agent and Shorts.
 2. **This repo**, anywhere; inside the ComfyUI folder is easiest:
 

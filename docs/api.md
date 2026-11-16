@@ -169,6 +169,13 @@ A conversation with Claude through the Claude Code program on this computer (`cl
 | GET, PATCH, DELETE | `/api/agent/{id}` | PATCH `{ask_first, title}`. GET fills in each action's job, progress and what it made. |
 | POST | `/api/agent/{id}/say` | `{text}`: Claude Code answers with words and actions. With `ask_first` the actions wait as `proposed`. |
 | POST | `/api/agent/{id}/act` | `{action, allow}`: run a proposed (or failed) action, or say no. |
+| GET, POST | `/api/blockouts` | Blockouts made in the Blockout room, and whether Blender is here; POST `{name, scene, idea, size}` makes one (no scene: a street to start from). |
+| GET, PUT, DELETE | `/api/blockouts/{id}` | GET adds `state` (`error` when the scene is not valid, `frames`, `current`: the last render is of the scene as it is) and the running render `job`. PUT `{name, size, idea, scene}`; the scene is kept as sent. |
+| POST | `/api/blockouts/{id}/make` | Render it in Blender (cpu lane). The video goes into the Library with `surface: blockout`. |
+| POST | `/api/blockouts/{id}/blender` | This computer only. Opens the scene in Blender's own window (`studio/blender/blockout_edit.py`). 400 if the scene has an error or there is no Blender. |
+| POST | `/api/blockouts/{id}/from_blender` | This computer only. `{scene}` as Blender read it back; saved like an edit, and `blender_at` is set so the open editor picks it up. |
+| POST | `/api/blockouts/write` | `{idea, scene?, size?}`: Claude Code writes a scene, or changes the one given. Starts it and answers `{task, phase, chars, expect, seconds, typical, done, result, error}`. Nothing is saved. |
+| GET, DELETE | `/api/blockouts/write/{task}` | How far it is: `phase` (starting, thinking, writing), `chars` of the answer so far, `expect` (about how long it will be), `typical` seconds; when `done`, `result` is `{scene, say, problem}` or `error` says why not. DELETE stops it. |
 | POST | `/api/shorts/plan` | `{idea, parts}` → a plan: title, look, place, people, beats with the action, sound and exact lines. |
 | POST | `/api/shorts` | `{plan, size, face, voice}`: renders the plan as one film whose parts continue each other. |
 
@@ -189,5 +196,6 @@ output/studio_next/            the studio's own data (STUDIO_HOME)
   library/folders.json         the Library's folders
   canvas/<id>.json             a board
   agent/<id>.json              an agent chat
+  blockout_scenes/<id>.json    a blockout of the Blockout room (its renders are in blockouts/free_<id>_<signature>/)
 output/long_video/st_<id>/     the parts of a film, as the long-video nodes keep them
 ```

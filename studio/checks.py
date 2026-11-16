@@ -85,6 +85,26 @@ def frame_diffs(path):
     return [float(x) for x in re.findall(r"YAVG=([\d.]+)", r.stdout)]
 
 
+def _small_frames(path, start=0.0, dur=None, w=32, h=18, fps=2):
+    cmd = ["ffmpeg", "-v", "error", "-ss", f"{start:.3f}", "-i", path] + (["-t", f"{dur:.3f}"] if dur else []) + \
+          ["-vf", f"fps={fps},scale={w}:{h}", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"]
+    b = subprocess.run(cmd, capture_output=True, timeout=300).stdout
+    n = w * h * 3
+    return [b[i:i + n] for i in range(0, len(b) - n + 1, n)]
+
+
+BLOCKOUT_LOOK = 12.0          # median colour difference (0-255) from the blockout below which a take is still the blockout
+
+
+def blockout_likeness(path, blockout_path, start=0.0):
+    """How far a take is from the blockout it follows: the median mean colour difference of small frames at the same
+    moments (0-255). Real takes measured 23-35; one that stayed the grey blockout with headlights 4.5 (2026-11-15)."""
+    t = _small_frames(path)
+    b = _small_frames(blockout_path, start, len(t) / 2 + 1)
+    d = sorted(sum(abs(x - y) for x, y in zip(a, c)) / len(a) for a, c in zip(t, b))
+    return d[len(d) // 2] if d else None
+
+
 def cuts_from(diffs, threshold=30.0, fps=FPS):
     """[(seconds, value)] for every frame-to-frame jump above the threshold."""
     return [((i + 1) / fps, v) for i, v in enumerate(diffs) if v > threshold]
@@ -331,7 +351,8 @@ def _item(name, status, text, **data):
 
 
 def review(path, *, lines=None, continuation=False, prev_path=None, first_picture=None, last_picture=None,
-           language="English", asks_for_cut=False, do_speech=True, thresholds=None, loud_reference=None):
+           language="English", asks_for_cut=False, do_speech=True, thresholds=None, loud_reference=None,
+           blockout=False, blockout_cuts=(), blockout_file="", blockout_start=0.0):
     """Run every check that applies to one clip. Returns {"ok", "checks": [...], "summary", "window", ...}.
 
     ok is False only when a check FAILED; skipped checks and notes leave it True.
@@ -349,11 +370,37 @@ def review(path, *, lines=None, continuation=False, prev_path=None, first_pictur
     window = window_from(diffs, th["cut"], fps)
     if asks_for_cut:
         items.append(_item("cuts", "note", describe_cuts(cuts) + " (the prompt asks for a cut)", cuts=cuts))
+    elif blockout and cuts:
+        # a clip that follows a blockout cuts where the blockout does: those are wanted. Others are only noted, since a
+        # blockout's own sudden moves (a close pass, a whip) can read as a cut too.
+        wanted = [t for t, _ in cuts if any(abs(t - b) <= 1.0 for b in blockout_cuts)]
+        other = [(t, v) for t, v in cuts if t not in wanted]
+        hard = [(t, v) for t, v in other if v >= 2 * th["cut"]]
+        if not other:
+            items.append(_item("cuts", "pass", describe_cuts(cuts) + ": where the blockout cuts", cuts=cuts))
+        elif hard:
+            # far above the threshold and nowhere near a cut of the blockout: a real cut (seen: a 2 s insert of a
+            # character's face reference on its white background at the end of a blocked drive part, jump 139)
+            items.append(_item("cuts", "fail", describe_cuts(hard) + " where the blockout does not cut", cuts=cuts))
+        else:
+            items.append(_item("cuts", "note", describe_cuts(other) + (" where the blockout does not cut" if blockout_cuts else
+                               " (it follows a blockout, so a cut can be the blockout's own)")
+                               + (f"; {len(wanted)} more where it does" if wanted else ""), cuts=cuts))
     elif cuts:
         items.append(_item("cuts", "fail", describe_cuts(cuts) + f"; the longest stretch without one is "
                            f"{window['in']:.1f}-{window['out']:.1f} s", cuts=cuts))
     else:
         items.append(_item("cuts", "pass", "no cuts", cuts=[]))
+
+    if blockout_file and os.path.isfile(blockout_file):
+        like = blockout_likeness(path, blockout_file, blockout_start)
+        if like is None:
+            items.append(_item("blockout look", "skip", "could not be compared with the blockout"))
+        elif like < BLOCKOUT_LOOK:
+            items.append(_item("blockout look", "fail", f"it still looks like the grey blockout (difference {like:.0f}, a real "
+                               f"take is over {BLOCKOUT_LOOK:.0f}): render it again with a higher blockout strength, e.g. 0.9995"))
+        else:
+            items.append(_item("blockout look", "pass", f"painted over the blockout (difference {like:.0f})"))
 
     if continuation and prev_path and os.path.isfile(prev_path):
         j = join_diff(prev_path, path)

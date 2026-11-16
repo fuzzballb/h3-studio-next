@@ -13,6 +13,7 @@ For an editor: an FCPXML and an EDL of the cut, and for DaVinci Resolve the medi
 free Resolve on Linux reads neither H.264 nor AAC). `conform` brings an editor's export back to the film's own size.
 """
 import math
+import hashlib
 import os
 import re
 import shutil
@@ -103,6 +104,10 @@ def from_film(film, upscaled=False):
         if not os.path.isfile(seg):
             continue
         c = add_clip(tl, path=seg, title=s.get("title") or f"shot {i + 1}")
+        if upscaled:  # the upscaled parts are picture only: their sound is the original part's, same timing
+            orig = films.part_files(film, s["part"])["segment"]
+            if os.path.isfile(orig):
+                c["sound"] = os.path.relpath(os.path.realpath(orig), os.path.realpath(config.OUTPUT_DIR)).replace(os.sep, "/")
         w = (t.get("checks") or {}).get("window") or {}
         if w and not w.get("whole") and not upscaled and w.get("out", 0) - w.get("in", 0) > 1.0:
             c["in"], c["out"] = w["in"], w["out"]
@@ -136,6 +141,9 @@ def timeline_srt(tl, clips, language="en"):
     """Captions of the whole cut from each clip's own transcript, shifted to where the clip sits. None without Whisper."""
     cues, offset = [], float(tl["title"]["seconds"]) if (tl["title"].get("text") or "").strip() else 0.0
     for c, path in clips:
+        if not checks.probe(path).get("has_audio"):  # nothing to hear: no captions for this clip
+            offset += c["out"] - c["in"]
+            continue
         heard = checks.transcribe(path, language)
         if heard is None:
             return None
@@ -243,12 +251,33 @@ def run_progress(cmd, total, say):
             raise Refused("ffmpeg failed: " + (errf.read().strip().splitlines() or ["no message"])[-1][:400])
 
 
+def with_sound(path, sound):
+    """The clip with the sound of another file (an upscaled part with its original part's sound), muxed once and kept."""
+    sp = os.path.join(config.OUTPUT_DIR, sound)
+    if not os.path.isfile(sp) or not checks.probe(sp).get("has_audio"):
+        return path
+    st, ss = os.stat(path), os.stat(sp)
+    key = hashlib.sha1(f"{os.path.realpath(path)}|{st.st_mtime_ns}|{os.path.realpath(sp)}|{ss.st_mtime_ns}".encode()).hexdigest()[:16]
+    out = config.home("cache", "with_sound", key + ".mkv")
+    if not os.path.isfile(out):
+        os.makedirs(os.path.dirname(out), exist_ok=True)
+        tmp = out + ".tmp.mkv"
+        r = subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", path, "-i", sp, "-map", "0:v:0", "-map", "1:a:0", "-c", "copy",
+                            "-shortest", tmp], capture_output=True, text=True)
+        if r.returncode != 0:
+            return path
+        os.replace(tmp, out)
+    return out
+
+
 def resolve_clips(tl):
     out = []
     for c in tl["clips"]:
         path = clip_path(c)
         if not path or not os.path.isfile(path):
             raise Refused(f"a clip of this timeline is gone: {c.get('title') or c.get('path')}")
+        if c.get("sound"):
+            path = with_sound(path, c["sound"])
         info = checks.probe(path)
         if not info.get("has_video"):
             raise Refused(f"{c.get('title')} cannot be read")

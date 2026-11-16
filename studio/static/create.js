@@ -113,7 +113,9 @@ ROOMS.picture = { title: "Picture", draw(root) {
 ROOMS.edit = { title: "Edit a picture", draw(root) {
   const pend = S.pending || {}; S.pending = null;
   const f = { picture: pend.picture || "", mode: pend.mode || (pend.angles ? "angles" : pend.template ? "sheet" : "words"), prompt: "", set: pend.angles && pend.angles !== "sheet" ? pend.angles : "around",
-    views: [], sheet: pend.template === "propsheet" ? "propsheet" : pend.angles === "sheet" ? "turnaround" : "turnaround", more: [], keep: true, size: "1344x768", seed: 0, takes: 1 };
+    views: [], sheet: pend.template === "propsheet" ? "propsheet" : "turnaround", more: [], keep: true, size: "1344x768", seed: 0, takes: 1 };
+  if (pend.prompt) f.prompt = pend.prompt;
+  const back = pend.back ? h("button", { class: "small", onclick: () => go(...pend.back) }, "← Back to " + (pend.backLabel || "the film")) : null;
   if (pend.angles === "sheet") f.mode = "sheet";
   const res = resultsBox();
   const body = h("div", {});
@@ -168,7 +170,7 @@ ROOMS.edit = { title: "Edit a picture", draw(root) {
       body,
       h("div", { class: "row", style: { marginTop: "14px" } }, h("div", { class: "field fit" }, h("label", {}, "Seed (0 = new)"), number(f, "seed", { min: 0, blankZero: true })),
         h("div", { class: "field fit" }, h("button", { class: "primary", onclick: make }, "Make")))),
-    h("h2", {}, "Made here"), res.box);
+    h("div", { class: "section-head" }, h("h2", {}, "Made here"), back), res.box);
   drawBody();
 } };
 
@@ -186,15 +188,16 @@ function videoPayload(f) {
     seed: f.seed || 0, notext: f.notext, one_take: f.one_take, talking_head: f.talking_head, prompt: f.prompt, language: f.language, loras: f.loras.filter(l => l.file) };
   if (f.start === "first" || f.start === "first_last") d.first_frame = f.first_frame;
   if (f.start === "first_last") d.last_frame = f.last_frame;
-  if (f.start === "blockout") Object.assign(d, { blockout: f.blockout, blockout_shapes: f.blockout_shapes, blockout_start: f.blockout_start || 0, blockout_strength: f.blockout_strength || 0 });
-  if (f.long) d.beats = f.beats.split("\n").map(s => s.trim()).filter(Boolean);
+  if (f.start === "blockout") Object.assign(d, { blockout: f.blockout, blockout_shapes: f.blockout_shapes, blockout_start: f.blockout_start || 0, blockout_strength: f.blockout_strength || 0,
+    whole_blockout: f.whole_blockout !== false && !!(BLOCKOUT_PARTS[f.blockout] || {}).parts && BLOCKOUT_PARTS[f.blockout].parts.length > 1 });
+  if (f.long && !d.whole_blockout) d.beats = f.beats.split("\n").map(s => s.trim()).filter(Boolean);
   return d;
 }
 function personCard(p, onchange, onremove) {
   return h("div", { class: "person" },
     h("div", { class: "row" },
       h("div", { class: "field" }, h("label", {}, "Name"), text(p, "name", { placeholder: "Mara", oninput: onchange })),
-      h("div", { class: "field fit" }, h("label", {}, "Their…"), select(p, "pronoun", [["her", "her"], ["his", "his"], ["their", "their"]], { onchange })),
+      h("div", { class: "field fit" }, h("label", {}, "Pronoun"), select(p, "pronoun", [["her", "her"], ["his", "his"], ["their", "their"]], { onchange })),
       onremove ? h("div", { class: "field fit" }, h("button", { class: "ghost small", onclick: onremove }, "Remove")) : null),
     field("Looks like", text(p, "description", { rows: 2, placeholder: "a woman in her thirties with shoulder-length dark hair, wearing a grey sweater", oninput: onchange }),
       "Describe only what a picture does not show, or what should differ from it."),
@@ -210,7 +213,7 @@ ROOMS.video = { title: "Video", draw(root, arg) {
   const f = Object.assign(blankVideoForm(), ROOMS.video.keep || {});
   if (Object.keys(pend).length) {
     Object.assign(f, blankVideoForm());
-    for (const k of ["start", "framing", "camera", "look", "action", "sound", "frames", "talking_head", "first_frame", "last_frame", "long", "variants"]) if (pend[k] !== undefined) f[k] = pend[k];
+    for (const k of ["start", "framing", "camera", "look", "action", "sound", "frames", "talking_head", "first_frame", "last_frame", "long", "variants", "blockout", "blockout_shapes", "size"]) if (pend[k] !== undefined) f[k] = pend[k];
     if (pend.size) { const s = P().sizes.find(x => x.name === pend.size); if (s) f.size = s.width + "x" + s.height; }
     if (pend.refs) f.refs = pend.refs;
     if (pend.action && pend.action.includes("{who}")) f.people = [{ name: "", pronoun: "their", description: "", face: "", body: "", voice: "" }];
@@ -220,77 +223,111 @@ ROOMS.video = { title: "Video", draw(root, arg) {
   const refreshPreview = debounce(preview, 500);
   const changed = () => refreshPreview();
 
+  // The full form as numbered steps, top to bottom. Only step 3 is needed; every other step has a default.
+  const stepHead = (n, title, sub, optional) => h("div", { class: "stephead" }, h("span", { class: "num" }, String(n)),
+    h("div", {}, h("h3", {}, title, optional ? h("span", { class: "opt" }, "optional") : null), sub ? h("p", {}, sub) : null));
+  const explain = (control, words) => h("div", { class: "explained" }, control, h("div", { class: "hint" }, words));
+  let showRefs = false;
+
   function drawForm() {
     const speakers = () => f.people.filter(p => p.name.trim()).map(p => [p.name, p.name]);
+    const named = f.people.filter(p => p.name.trim());
+    const isBlockout = f.start === "blockout";
     form.replaceChildren(
+      h("details", { class: "card howto", open: true },
+        h("summary", {}, "How this page works"),
+        h("ol", {},
+          h("li", {}, "Go through the steps from top to bottom. ", h("b", {}, "Only step 3 (what happens) is needed"), "; the other steps have defaults that work."),
+          h("li", {}, "On the right is the prompt the model will get, built from what you fill in. It updates as you type. Below it, the prompt check points out words that often go wrong."),
+          h("li", {}, "Press ", h("b", {}, "Render"), ". The clip appears under ", h("b", {}, "Your clips"), " at the bottom, where you can watch it, render it again or carry it on.")),
+        h("p", { class: "muted small", style: { margin: "8px 0 0" } }, "For a quick clip the ", h("a", { href: "#video" }, "prompt bar on the Video page"), " does the same with fewer choices.")),
+
       h("div", { class: "card" },
-        h("h3", {}, "The clip starts from"),
+        stepHead(1, "What the clip starts from", "Besides your words, what the model has to go on. Most clips start from words only or from a first frame."),
         h("div", { class: "choice" }, [["text", "Words only", "The model invents everything."], ["first", "A first frame", "It opens on your picture."],
-          ["first_last", "First and last frame", "It opens on one picture and ends on another."], ["refs", "References", "People, a place, things that must look the same."],
+          ["first_last", "First and last frame", "It opens on one picture and ends on another."], ["refs", "Reference pictures", "People, a place or things that must look like your pictures."],
           ["blockout", "A blockout video", "A rough video (grey shapes from Blender, a phone clip) sets the camera, positions and motion."]]
           .map(([id, b, s]) => h("button", { class: f.start === id ? "on" : "", onclick: () => { f.start = id; drawForm(); changed(); } }, h("b", {}, b), h("span", {}, s)))),
         f.start === "first" || f.start === "first_last" ? h("div", { class: "row" },
-          h("div", { class: "field" }, h("label", {}, "First frame"), refPicker(f, "first_frame", { onchange: changed, empty: "pick, upload, or make one in Picture" })),
+          h("div", { class: "field" }, h("label", {}, "First frame"), refPicker(f, "first_frame", { onchange: changed, empty: "pick, upload, or make one in Image" })),
           f.start === "first_last" ? h("div", { class: "field" }, h("label", {}, "Last frame"), refPicker(f, "last_frame", { onchange: changed })) : null) : null,
-        f.start === "blockout" ? [
+        f.start === "refs" ? h("div", { class: "note" }, "Give each person a face picture in step 2, and add pictures of the place or of things under ", h("b", {}, "Reference pictures"), " there too. The prompt on the right names them Picture 1, Picture 2…") : null,
+        isBlockout ? [
           h("div", { class: "row" },
             h("div", { class: "field" }, h("label", {}, "The blockout video"), refPicker(f, "blockout", { kind: "clip", onchange: changed, empty: "pick or upload a video" })),
             h("div", { class: "field fit" }, h("label", {}, "Starts at frame"), number(f, "blockout_start", { min: 0, blankZero: true, oninput: changed, placeholder: "0" })),
             h("div", { class: "field fit" }, h("label", {}, "Strength"), number(f, "blockout_strength", { min: 0.9, max: 1, step: 0.0005, blankZero: true, oninput: changed, placeholder: "0.997" }))),
+          blockoutPartsNote(f, () => drawForm()),
           field("What the shapes are", text(f, "blockout_shapes", { oninput: changed, placeholder: "the grey figure is Mara; the red box is her car" }),
-            "The clip keeps the blockout's camera, framing, positions and timing; the model paints real people and places over it. Leave Framing and Camera below empty. Strength: 0.997 looks real and follows the camera; 0.994 leaves flat textured blocks; 0.9995 often loses the camera. A long take reads on in the same blockout.")] : null,
-        h("div", { class: "spread" }, h("h3", { style: { margin: "6px 0" } }, "People"), h("button", { class: "small", onclick: () => { f.people.push({ name: "", pronoun: "their", description: "", face: "", body: "", voice: "" }); drawForm(); } }, "+ Person")),
-        f.people.length ? f.people.map((p, i) => personCard(p, changed, () => { f.people.splice(i, 1); drawForm(); changed(); }))
-          : h("div", { class: "faint small", style: { marginBottom: "12px" } }, "Add a person to give them a face picture, an outfit sheet or a voice, and to write their lines."),
-        h("div", { class: "spread" }, h("h3", { style: { margin: "6px 0" } }, "Further reference pictures"),
-          h("button", { class: "small", onclick: async () => { const got = await pickAsset("image", { multiple: true }); if (got) { f.refs.push(...got.map(a => ({ file: a.ref, label: a.name }))); drawForm(); changed(); } } }, "+ Pictures")),
-        f.refs.length ? h("div", { class: "tiles", style: { marginBottom: "12px" } }, f.refs.map((r, i) => h("div", { class: "tile" }, h("div", { class: "pic", style: { backgroundImage: `url("${refThumb(r.file)}")` } }),
-          h("div", { class: "meta" }, text(r, "label", { placeholder: "what it is", oninput: changed })), h("div", { class: "acts" }, h("button", { class: "small ghost", onclick: () => { f.refs.splice(i, 1); drawForm(); changed(); } }, "Remove"))))) : null),
+            "The clip keeps the blockout's camera, framing, positions and timing; the model paints real people and places over it. Strength: 0.997 looks real and follows the camera (leave it empty for that); 0.994 leaves flat textured blocks; 0.9995 often loses the camera.")] : null),
 
       h("div", { class: "card" },
-        tabs([["fields", "In fields"], ["free", "My own prompt"]], f.mode, m => { f.mode = m; drawForm(); changed(); }),
+        stepHead(2, "Who is in it", "Only needed when someone must look like a picture, speak in a voice from a sample, or say lines. Otherwise describe people in step 3.", true),
+        f.people.map((p, i) => personCard(p, changed, () => { f.people.splice(i, 1); drawForm(); changed(); })),
+        h("div", { class: "row", style: { gap: "8px" } },
+          h("button", { class: "small", onclick: () => { f.people.push({ name: "", pronoun: "their", description: "", face: "", body: "", voice: "" }); drawForm(); } }, "+ Person"),
+          f.start === "refs" || f.refs.length || showRefs ? null : h("button", { class: "small ghost", onclick: () => { showRefs = true; drawForm(); } }, "+ Reference pictures of a place or things")),
+        f.start === "refs" || f.refs.length || showRefs ? [
+          h("div", { class: "spread", style: { marginTop: "14px" } }, h("h4", { style: { margin: 0 } }, "Reference pictures"),
+            h("button", { class: "small", onclick: async () => { const got = await pickAsset("image", { multiple: true }); if (got) { f.refs.push(...got.map(a => ({ file: a.ref, label: a.name }))); drawForm(); changed(); } } }, "+ Pictures")),
+          h("div", { class: "hint", style: { margin: "4px 0 8px" } }, "A place, a car, a prop: anything that must look the same as in the picture. Say in a word or two what each one is."),
+          f.refs.length ? h("div", { class: "tiles", style: { marginBottom: "4px" } }, f.refs.map((r, i) => h("div", { class: "tile" }, h("div", { class: "pic", style: { backgroundImage: `url("${refThumb(r.file)}")` } }),
+            h("div", { class: "meta" }, text(r, "label", { placeholder: "what it is", oninput: changed })), h("div", { class: "acts" }, h("button", { class: "small ghost", onclick: () => { f.refs.splice(i, 1); drawForm(); changed(); } }, "Remove"))))) : null] : null),
+
+      h("div", { class: "card" },
+        stepHead(3, "What happens", "The one step you have to fill in. Say where it is, what happens, what people say and what is heard."),
+        tabs([["fields", "Fill in the parts"], ["free", "Write the whole prompt myself"]], f.mode, m => { f.mode = m; drawForm(); changed(); }),
         f.mode === "free" ? [
           field("The whole prompt", text(f, "prompt", { rows: 9, mono: true, oninput: changed, placeholder: "[Shot 1] A narrow street market at night…\n\noverall_soundscape:\nRain on awnings, distant traffic." }),
-            "Sent as written, after the look's opening line. Name pictures as the list on the right numbers them (Picture 1…). {DIALOGUE} is where the lines go; without it they are added at the end.")]
+            "For people who know H3 prompts. Sent as written, after the look's opening line. Name pictures as the list on the right numbers them (Picture 1…). {DIALOGUE} is where the spoken lines go; without it they are added at the end.")]
         : [
-          field("The place", text(f, "place", { rows: 2, oninput: changed, placeholder: "A small corner café in the morning: wooden tables, a steaming espresso machine behind the counter. Other guests sit at the back tables; they stay in the background." }),
+          field("Where", text(f, "place", { rows: 2, oninput: changed, placeholder: "A small corner café in the morning: wooden tables, a steaming espresso machine behind the counter. Other guests sit at the back tables; they stay in the background." }),
             "Say what is there. A busy place needs people in it."),
-          f.people.filter(p => p.name.trim()).length ? h("div", { class: "field" }, h("label", {}, "Where each one is"),
-            f.people.filter(p => p.name.trim()).map(p => { f.staging = f.staging || {}; return h("div", { class: "row", style: { marginBottom: "6px" } }, h("div", { class: "fit muted", style: { width: "110px" } }, p.name),
+          named.length ? h("div", { class: "field" }, h("label", {}, "Where each person is"),
+            named.map(p => { f.staging = f.staging || {}; return h("div", { class: "row", style: { marginBottom: "6px" } }, h("div", { class: "fit muted", style: { width: "110px" } }, p.name),
               h("div", { class: "field", style: { marginBottom: 0 } }, text(f.staging, p.name, { oninput: changed, placeholder: "sits at the table on the left side of the picture" }))); }),
             h("div", { class: "hint" }, "Name the side of the picture: left and right are not guessed.")) : null,
-          h("div", { class: "row" },
-            h("div", { class: "field" }, h("label", {}, "Framing"), select(f, "framing", framingOptions(), { onchange: changed })),
-            h("div", { class: "field" }, h("label", {}, "Camera"), select(f, "camera", cameraOptions(), { onchange: changed }))),
           field("What happens", text(f, "action", { rows: 3, oninput: changed, placeholder: "Mara stirs her coffee and looks up as Tom sits down across from her." }),
-            "Few actions in one part. Every word someone says goes in a line below, never in here."),
+            "One or two actions per clip work best. Words people say do not go here: put them in Spoken lines."),
           h("div", { class: "field" }, h("label", {}, "Spoken lines"), linesEditor(f.lines, speakers, changed),
-            f.people.length ? null : h("div", { class: "hint" }, "Add people above to pick who speaks.")),
-          field("Sound", text(f, "sound", { oninput: changed, placeholder: "Cups clinking, a quiet espresso machine, soft chatter far in the back." }))]),
+            h("div", { class: "hint" }, named.length ? "The exact words, one line per turn. Anything not written here is not said; with no lines nobody speaks."
+              : "The exact words. To choose who says them, add the people in step 2 first.")),
+          field("Sound", text(f, "sound", { oninput: changed, placeholder: "Cups clinking, a quiet espresso machine, soft chatter far in the back." }),
+            "Everything heard besides the spoken lines.")]),
 
       h("div", { class: "card" },
+        stepHead(4, "Camera and look", isBlockout ? "With a blockout the camera and framing come from the video, so they are left out here." : "Leave anything on its default and the model decides. Look is the style: realism, film, animation…", true),
+        isBlockout ? null : h("div", { class: "row top" },
+          h("div", { class: "field" }, h("label", {}, "Framing"), select(f, "framing", framingOptions(), { onchange: changed }), h("div", { class: "hint" }, "How much of the scene is in the picture: close-up, medium, wide…")),
+          h("div", { class: "field" }, h("label", {}, "Camera"), select(f, "camera", cameraOptions(), { onchange: changed }), h("div", { class: "hint" }, "How the camera moves during the clip."))),
         h("div", { class: "row" },
           h("div", { class: "field" }, h("label", {}, "Look"), select(f, "look", lookOptions(), { onchange: changed })),
           h("div", { class: "field" }, h("label", {}, "Lens"), select(f, "lens", lensOptions(), { onchange: changed })),
           h("div", { class: "field" }, h("label", {}, "Light"), select(f, "light", lightOptions(), { onchange: changed }))),
-        field("Or the look in your own words", text(f, "style", { oninput: changed, placeholder: "The video is in … style: …  (replaces the look, lens and light above)" })),
+        field("Or the look in your own words", text(f, "style", { oninput: changed, placeholder: "The video is in … style: …" }), "Replaces the look, lens and light above.")),
+
+      h("div", { class: "card" },
+        stepHead(5, "Size and length", "Up to 15 s per clip (for longer, see the long take under More settings). Bigger and longer clips take longer to render; the time is on the right.", true),
         h("div", { class: "row" },
           h("div", { class: "field" }, h("label", {}, "Size"), select(f, "size", sizeOptions(), { onchange: changed })),
-          h("div", { class: "field" }, h("label", {}, "Length"), select(f, "frames", lengthOptions(false), { number: true, onchange: changed })),
-          h("div", { class: "field fit" }, h("label", {}, "Seed (0 = new)"), number(f, "seed", { min: 0, blankZero: true })),
-          h("div", { class: "field fit" }, h("label", {}, "Language"), text(f, "language", { oninput: changed }))),
-        h("div", { class: "row" },
-          h("div", { class: "fit" }, check(f, "turbo", "Turbo (8 steps)", { onchange: changed })),
-          h("div", { class: "fit" }, check(f, "one_take", "One continuous take", { onchange: changed })),
-          h("div", { class: "fit" }, check(f, "notext", "Keep lettering out", { onchange: changed })),
-          h("div", { class: "fit" }, check(f, "talking_head", "Speaks to the camera", { onchange: changed }))),
-        h("details", {}, h("summary", { class: "muted", style: { cursor: "pointer", marginBottom: "10px" } }, "LoRAs, a long take, several looks"),
-          h("h3", {}, "LoRAs"), lorasEditor(f.loras, changed),
-          h("div", { style: { marginTop: "14px" } }, check(f, "long", "A long take: more parts that continue this one", { onchange: () => drawForm() })),
-          f.long ? field("What happens next, one line a part", text(f, "beats", { rows: 4, placeholder: "She stands up and walks to the window.\nShe opens the window and leans out." }),
-            "Each line is a part of 8.5 s that continues the one before in latent space: the place, the light and the sound carry through.") : null,
-          check(f, "variants", "Render it in several looks", { onchange: () => drawForm() }),
-          f.variants ? h("div", { class: "choice" }, P().looks.styles.map(s => h("button", { class: "small" + (f.looks.includes(s.id) ? " on" : ""), onclick: e => { f.looks.includes(s.id) ? f.looks.splice(f.looks.indexOf(s.id), 1) : f.looks.push(s.id); e.currentTarget.classList.toggle("on"); } }, s.name))) : null)));
+          h("div", { class: "field" }, h("label", {}, "Length"), select(f, "frames", lengthOptions(false), { number: true, onchange: changed }))),
+        explain(check(f, "turbo", "Turbo", { onchange: changed }), "On: 8 steps, much quicker, good for most clips. Off: all steps, finer detail, takes several times as long.")),
+
+      h("details", { class: "card more" },
+        h("summary", {}, h("span", { class: "num" }, "6"), h("b", {}, "More settings"), h("span", { class: "opt" }, "optional"), h("span", { class: "muted small" }, " seed, language, LoRAs, a long take, several looks")),
+        h("div", { class: "row top", style: { marginTop: "12px" } },
+          h("div", { class: "field fit" }, h("label", {}, "Seed"), number(f, "seed", { min: 0, blankZero: true }), h("div", { class: "hint" }, "Empty: a new one each time. The same seed with the same settings gives the same clip.")),
+          h("div", { class: "field fit" }, h("label", {}, "Language"), text(f, "language", { oninput: changed }), h("div", { class: "hint" }, "The language the lines are spoken in."))),
+        explain(check(f, "one_take", "One continuous take", { onchange: changed }), "Asks the model not to cut to another camera angle inside the clip."),
+        explain(check(f, "notext", "Keep lettering out", { onchange: changed }), "Asks for no text, signs or subtitles in the picture."),
+        explain(check(f, "talking_head", "Speaks to the camera", { onchange: changed }), "The person talks straight into the lens, like a presenter."),
+        h("h4", {}, "LoRAs"), h("div", { class: "hint", style: { marginBottom: "6px" } }, "Add-on models for a person, a style or a kind of motion. Keep the strengths together around 1.2 to 1.3."),
+        lorasEditor(f.loras, changed),
+        h("div", { style: { marginTop: "14px" } }, explain(check(f, "long", "A long take", { onchange: () => drawForm() }), "More parts that continue this clip without a cut, for shots longer than 15 s.")),
+        f.long ? field("What happens next, one line per part", text(f, "beats", { rows: 4, placeholder: "She stands up and walks to the window.\nShe opens the window and leans out." }),
+          "Each line becomes a part of 8.5 s that continues the one before: the place, the light and the sound carry through.") : null,
+        explain(check(f, "variants", "Render it in several looks", { onchange: () => drawForm() }), "The same clip once per look you pick, to compare them."),
+        f.variants ? h("div", { class: "choice" }, P().looks.styles.map(s => h("button", { class: "small" + (f.looks.includes(s.id) ? " on" : ""), onclick: e => { f.looks.includes(s.id) ? f.looks.splice(f.looks.indexOf(s.id), 1) : f.looks.push(s.id); e.currentTarget.classList.toggle("on"); } }, s.name))) : null));
   }
 
   async function preview() {
@@ -298,15 +335,16 @@ ROOMS.video = { title: "Video", draw(root, arg) {
     try { c = await api("/api/compose", videoPayload(f)); } catch (e) { side.replaceChildren(h("div", { class: "note bad" }, e.message)); return; }
     side.replaceChildren(
       h("div", { class: "card" },
-        h("div", { class: "spread" }, h("h3", { style: { margin: 0 } }, "What the model gets"),
-          h("span", { class: "muted small" }, `${c.width}x${c.height} · ${c.frames} frames · ${(c.frames / 24).toFixed(1)} s` + (c.estimate ? " · about " + secs(c.estimate) : ""))),
+        h("div", { class: "spread" }, h("h3", { style: { margin: 0 } }, "The prompt the model gets"),
+          h("span", { class: "muted small" }, `${c.width}x${c.height} · ${(c.frames / 24).toFixed(1)} s` + (c.estimate ? " · takes about " + secs(c.estimate) : ""))),
+        h("div", { class: "hint" }, "Built from the steps on the left; it updates as you type. You do not need to edit it."),
         c.blockout ? h("div", { class: "note", style: { marginTop: "10px" } }, `Follows the blockout from frame ${c.blockout.start} to ${c.blockout.end - 1} (${(c.blockout.start / 24).toFixed(1)}–${(c.blockout.end / 24).toFixed(1)} s)` + (c.blockout.frames ? ` of its ${c.blockout.frames}` : "") + `, strength ${c.blockout.strength}.`) : null,
         h("div", { class: "prompt", style: { marginTop: "10px" } }, c.prompt),
         c.pictures.length ? h("div", { class: "small", style: { marginTop: "8px" } }, c.pictures.map(p => h("div", {}, h("b", {}, "Picture " + p.n), " — " + p.what))) : null,
         c.audios.length ? h("div", { class: "small" }, c.audios.map(a => h("div", {}, h("b", {}, "Audio " + a.n), " — " + a.speaker + "'s voice"))) : null,
         c.fit && c.fit.text ? h("div", { class: "note " + (c.fit.ok ? "warn" : "bad"), style: { marginTop: "10px" } }, c.fit.text) : null,
         h("div", { style: { marginTop: "12px" } }, h("button", { class: "primary", onclick: render }, f.variants && f.looks.length ? `Render ${f.looks.length} looks` : f.long ? "Render the long take" : "Render"))),
-      h("div", { class: "card" }, h("h3", {}, "Prompt check"), findingsList(c.findings)));
+      h("div", { class: "card" }, h("h3", {}, "Prompt check"), h("div", { class: "hint", style: { marginBottom: "8px" } }, "Words and settings that often go wrong with this model, and what to do instead."), findingsList(c.findings)));
   }
   async function render() {
     const d = videoPayload(f);
@@ -314,26 +352,74 @@ ROOMS.video = { title: "Video", draw(root, arg) {
     if ((f.start === "first" || f.start === "first_last") && !f.first_frame) return toast("Pick the first frame", true);
     if (f.start === "blockout" && !f.blockout) return toast("Pick the blockout video", true);
     const r = f.variants && f.looks.length ? await tryApi("/api/clips/variants", { ...d, looks: f.looks }) : await tryApi("/api/clips", d);
-    if (r) { toast("Queued"); poll(); loadClips(); }
+    if (!r) return;
+    poll();
+    if (r.film && !r.clips) { toast("Queued: this page shows how far it is"); go("video", "clip/" + r.film); }   // follow it there
+    else { toast("Queued"); loadClips(); }
   }
   async function loadClips() {
     const list = await tryApi("/api/films?quick=1");
     if (!list) return;
     clips.replaceChildren(list.length ? list.slice(0, 12).map(c => h("button", { class: "app card", style: { margin: 0 }, onclick: () => go("video", "clip/" + c.id) },
-      h("b", {}, c.name), h("span", {}, `${c.shots} part(s) · ${secs(c.seconds)} · ${ago(c.updated)}`), c.review ? h("span", { class: "chip warn" }, "look at it") : null))
+      h("b", {}, c.name), h("span", {}, `${c.shots} part(s) · ${secs(c.seconds)} · ${ago(c.updated)}`), c.review ? h("span", { class: "chip warn" }, "look at it") : null, clipJobChip(c.id)))
       : h("div", { class: "empty", style: { gridColumn: "1 / -1" } }, "Clips you render appear here."));
   }
   onJobEnd(j => { if (j.kind === "shot") loadClips(); });
-  root.append(head("Video", "MiniMax H3 makes picture and sound together. One part is up to 15 s; longer shots are parts that continue each other."),
+  onPoll(clips, () => { for (const el of clips.querySelectorAll("[data-clipjob]")) el.replaceWith(clipJobChip(el.dataset.clipjob)); });
+  root.append(head("Video, full form", "MiniMax H3 makes picture and sound together, up to 15 s per clip. Fill in the steps, check the prompt on the right, then Render."),
     h("div", { class: "grid2" }, form, h("div", { style: { position: "sticky", top: 0 } }, side)),
     h("h2", { style: { marginTop: "10px" } }, "Your clips"), clips);
   drawForm(); preview(); loadClips();
 } };
 
+// How far a clip's render is, as a chip for its card ("rendering · 2/8 · about 9 min left"); empty when nothing runs.
+function clipJobChip(fid) {
+  const j = (S.state.jobs || []).find(j => j.film === fid && (j.status === "running" || j.status === "queued"));
+  if (!j) return h("span", { "data-clipjob": fid, hidden: true });
+  const p = j.progress || {}, left = j.eta ? j.eta - Date.now() / 1000 : 0;
+  return h("span", { class: "chip", "data-clipjob": fid }, j.status === "queued" ? "waiting in the queue" :
+    "rendering" + (p.max ? ` · ${p.text || "step"} ${p.value}/${p.max}` : p.text ? " · " + p.text : "") + (left > 5 ? " · about " + secs(left) + " left" : ""));
+}
+
+// A blockout from the Blockout room is often longer than one clip: then the clip follows all of it in parts that end on
+// its cuts (the server plans them, compose.blockout_parts). BLOCKOUT_PARTS caches that plan per video.
+const BLOCKOUT_PARTS = {};
+function blockoutPartsNote(f, redraw) {
+  const ref = f.blockout;
+  if (!ref) return null;
+  const info = BLOCKOUT_PARTS[ref];
+  if (info === undefined) {
+    BLOCKOUT_PARTS[ref] = null;
+    tryApi("/api/blockout_parts?ref=" + encodeURIComponent(ref)).then(r => { BLOCKOUT_PARTS[ref] = r || {}; redraw(); });
+    return null;
+  }
+  if (!info || !info.parts || info.parts.length < 2) return null;
+  const s = n => (n / 24).toFixed(1);
+  const on = f.whole_blockout !== false;
+  return h("div", { class: "note", style: { margin: "8px 0" } },
+    h("label", { class: "check" }, h("input", { type: "checkbox", checked: on, onchange: e => { f.whole_blockout = e.target.checked; redraw(); } }),
+      ` Follow the whole blockout (${s(info.total)} s) in ${info.parts.length} parts`),
+    h("div", { class: "hint" }, on ? "One clip holds at most 14.4 s. The parts end on the blockout's own cuts where they can, so each new part opens on a cut: "
+      + info.parts.map((p, i) => `${i + 1}: ${s(p.start)}–${s(p.start + p.frames)} s${p.new_shot ? "" : " (continues)"}`).join(" · ")
+      + ". Length and the start frame above are then set by the parts. Rendering all of them takes a while; they render one after the other."
+      : `Off: one clip of the length in step 5, from the start frame above (the rest of the blockout is not used).`));
+}
+
 // One quick clip: its video, its takes and checks, extend, render again, upscale.
 async function drawClip(root, fid) {
   const box = h("div", {});
-  root.append(h("button", { class: "ghost small", onclick: () => go("video") }, "← Video"), box);
+  // what is rendering for this clip right now: the same card as in the queue (bar, step, time left), kept up to date
+  const liveBox = h("div", { class: "cliplive" });
+  let wasLive = false;
+  onPoll(liveBox, st => {
+    const jobs = (st.jobs || []).filter(j => j.film === fid && (j.status === "running" || j.status === "queued"));
+    liveBox.replaceChildren(jobs.length ? h("div", { class: "card" }, h("h3", { style: { marginTop: 0 } }, "Rendering now"),
+      h("div", { class: "hint", style: { marginBottom: "8px" } }, "ComfyUI makes the clip on this computer. The bar follows its sampling steps; after the last step it decodes the video and checks it. The clip shows up here when it is done."),
+      jobs.map(jobCard)) : "");
+    if (wasLive && !jobs.length) load();
+    wasLive = jobs.length > 0;
+  });
+  root.append(h("button", { class: "ghost small", onclick: () => go("video") }, "← Video"), liveBox, box);
   const ext = { action: "", lines: [], frames: 243, sound: "" };
   async function load() {
     const f = await tryApi("/api/films/" + fid);
@@ -351,6 +437,9 @@ async function drawClip(root, fid) {
               f.asset ? h("button", { onclick: () => addToTimeline([f.asset]) }, "+ Timeline") : null,
               f.asset ? h("button", { onclick: () => openAsset(f.asset) }, "More…") : null))
             : h("div", { class: "empty" }, busy ? "Rendering…" : "Not rendered yet."),
+          last && last.blockout ? h("div", { class: "card" }, h("h3", {}, "The rest of the blockout"),
+            h("div", { class: "hint", style: { marginBottom: "8px" } }, "Adds the parts this clip needs to follow its blockout to the end, ending on the blockout's cuts where it can, and renders them in order."),
+            h("button", { disabled: busy, onclick: async () => { const r = await tryApi(`/api/clips/${fid}/cover_blockout`, {}); if (r) { toast(`${r.added} part(s) added; they render one after the other`); poll(); load(); } } }, "Follow the rest of the blockout")) : null,
           h("div", { class: "card" }, h("h3", {}, "Carry it on"),
             field("What happens next", text(ext, "action", { rows: 2, placeholder: "She puts the cup down and looks out of the window." }),
               "A new part that continues the last frames and their sound. Describe only what is in view at the end of the clip."),

@@ -12,7 +12,7 @@ import shutil
 import subprocess
 import time
 
-from . import blockouts, checks, compose, config, films, graphs, lengths, library, machine, models, presets
+from . import blockout_scenes, blockouts, checks, compose, config, films, graphs, lengths, library, machine, models, presets
 from .comfy import files_of
 from .jobs import Cancelled, Refused
 
@@ -91,7 +91,7 @@ async def image(job, ctx):
     for i, (label, prompt) in enumerate(plans):
         ctx.check_cancel()
         seed = seed0 if p.get("angles") else seed0 + i
-        prefix = f"studio/images/{name}_{job['id']}_{i + 1}"
+        prefix = f"{config.out_sub('images')}/{name}_{job['id']}_{i + 1}"
         g = graphs.image(roles, prompt=prompt, prefix=prefix, width=int(p.get("width") or s["width"]),
                          height=int(p.get("height") or s["height"]), seed=seed, steps=int(p.get("steps") or s["steps"]),
                          pictures=pictures, keep_size=bool(p.get("keep_size")) and bool(pictures),
@@ -206,6 +206,9 @@ async def shot(job, ctx):
         review = await ctx.thread(checks.review, files["segment"], lines=c["lines"], continuation=c["continuation"],
                                   prev_path=prev_seg, first_picture=first_pic, last_picture=last_pic,
                                   language=c["language"], asks_for_cut=c["asks_for_cut"],
+                                  blockout=bool(c.get("blockout")), blockout_cuts=c.get("blockout_cuts") or [],
+                                  blockout_file=config.ref_path(c["blockout"]["file"]) if c.get("blockout") else "",
+                                  blockout_start=(c["blockout"].get("start") or 0) / 24 if c.get("blockout") else 0.0,
                                   loud_reference=films.speech_levels(film, but=sh["id"]))
     except BaseException as e:
         with films.LOCK:
@@ -338,7 +341,7 @@ async def tts(job, ctx):
     if not text:
         raise Refused("write the words to speak")
     name = config.slug(p.get("name") or text, "voice", 28)
-    g = graphs.tts(text=text, voice=voice, prefix=f"studio/audio/{name}_{job['id']}", seed=int(p.get("seed") or 1),
+    g = graphs.tts(text=text, voice=voice, prefix=f"{config.out_sub('audio')}/{name}_{job['id']}", seed=int(p.get("seed") or 1),
                    language=p.get("language") or "local:English")
     out = await ctx.render(g, {"1": "loading the voice model", "2": "speaking", "3": "saving"})
     made = []
@@ -415,36 +418,8 @@ async def location_sound(job, ctx):
     return {"asset": new["id"]}
 
 
-@handler("cpu")
-async def blockout(job, ctx):
-    """Render the blockout of a scene in Blender and give it its video.
-
-    params: film, blockout (its id). The video runs long enough for every shot of the scene to read its stretch
-    (blockouts.cuts) and for the whole scene; each shot then follows its stretch (compose.blockout_plan)."""
-    p = job["params"]
-    exe = blockouts.blender()
-    if not exe:
-        raise Refused("Blender was not found: install it, or set its path in Machine → Settings (blender)")
-    with films.LOCK:
-        film = films.load(p["film"])
-        if not film:
-            raise Refused("this film no longer exists")
-        b = blockouts.find(film, p["blockout"])
-        if not b:
-            raise Refused("this blockout no longer exists")
-        if not b.get("scene"):
-            raise Refused("this blockout has no scene written yet")
-        try:
-            scene = blockouts.normalize(b["scene"])
-        except blockouts.BadScene as e:
-            raise Refused(f"the blockout scene: {e}")
-        frames = blockouts.render_frames(film, b, scene)
-        bible = {**compose.blank_bible(), **(film.get("bible") or {})}
-        w, hgt = int(bible["width"]), int(bible["height"])
-        bid = b["id"]
-        label = b.get("scene_name") or "the film"
-    sig = blockouts.signature(scene, frames, w, hgt)
-    out = config.home("blockouts", f"{film['id']}_{bid}_{sig}")
+async def render_blockout(scene, frames, w, hgt, out, job, ctx, exe):
+    """Render a (normalized) blockout scene in Blender into out/blockout.mp4. Returns (mp4 path, stats or None)."""
     os.makedirs(out, exist_ok=True)
     config.write_json(os.path.join(out, "scene.json"), scene)
     ctx.say("Blender: building the scene")
@@ -487,12 +462,45 @@ async def blockout(job, ctx):
         for f in pngs:
             os.remove(os.path.join(out, f))
     await ctx.thread(encode)
-    ref = config.out_ref(mp4)
     try:
         with open(os.path.join(out, "stats.json")) as fh:
             stats = json.load(fh)
     except (OSError, ValueError):
         stats = None
+    return mp4, stats
+
+
+@handler("cpu")
+async def blockout(job, ctx):
+    """Render the blockout of a scene in Blender and give it its video.
+
+    params: film, blockout (its id). The video runs long enough for every shot of the scene to read its stretch
+    (blockouts.cuts) and for the whole scene; each shot then follows its stretch (compose.blockout_plan)."""
+    p = job["params"]
+    exe = blockouts.blender()
+    if not exe:
+        raise Refused("Blender was not found: install it, or set its path in Machine → Settings (blender)")
+    with films.LOCK:
+        film = films.load(p["film"])
+        if not film:
+            raise Refused("this film no longer exists")
+        b = blockouts.find(film, p["blockout"])
+        if not b:
+            raise Refused("this blockout no longer exists")
+        if not b.get("scene"):
+            raise Refused("this blockout has no scene written yet")
+        try:
+            scene = blockouts.normalize(b["scene"])
+        except blockouts.BadScene as e:
+            raise Refused(f"the blockout scene: {e}")
+        frames = blockouts.render_frames(film, b, scene)
+        bible = {**compose.blank_bible(), **(film.get("bible") or {})}
+        w, hgt = int(bible["width"]), int(bible["height"])
+        bid = b["id"]
+        label = b.get("scene_name") or "the film"
+    sig = blockouts.signature(scene, frames, w, hgt)
+    mp4, stats = await render_blockout(scene, frames, w, hgt, config.home("blockouts", f"{film['id']}_{bid}_{sig}"), job, ctx, exe)
+    ref = config.out_ref(mp4)
 
     def keep():
         with films.LOCK:
@@ -507,6 +515,35 @@ async def blockout(job, ctx):
     rendered = await ctx.thread(keep)
     return {"film": p["film"], "blockout_id": bid, "scene": label, "blockout": ref, "frames": frames,
             "seconds": round(frames / 24, 1), "rerender": rendered, "stats": stats, "small": blockouts.too_small(stats)}
+
+
+@handler("cpu")
+async def blockout_free(job, ctx):
+    """Render a blockout made in the Blockout room (blockout_scenes) in Blender, and put its video in the Library.
+
+    params: blockout (its id)."""
+    bid = job["params"]["blockout"]
+    exe = blockouts.blender()
+    if not exe:
+        raise Refused("Blender was not found: install it, or set its path in Machine → Settings (blender)")
+    try:
+        b = blockout_scenes.load(bid)
+    except KeyError:
+        raise Refused("this blockout no longer exists")
+    try:
+        scene = blockouts.normalize(b.get("scene"))
+    except blockouts.BadScene as e:
+        raise Refused(f"the scene: {e}")
+    frames = max(blockouts.scene_frames(scene), 24)
+    w, hgt = blockout_scenes.size_of(b)
+    sig = blockouts.signature(scene, frames, w, hgt)
+    mp4, stats = await render_blockout(scene, frames, w, hgt, config.home("blockouts", f"free_{bid}_{sig}"), job, ctx, exe)
+    shapes = blockout_scenes.shapes_text(scene)
+    a = library.add(mp4, "clip", name=f"Blockout · {b['name']}", surface="blockout", blockout=bid,
+                    form={"blockout_shapes": shapes})
+    blockout_scenes.made(bid, config.out_ref(mp4), a["id"], sig, stats, shapes=shapes)
+    return {"blockout_id": bid, "blockout": config.out_ref(mp4), "assets": [a["id"]], "frames": frames,
+            "seconds": round(frames / 24, 1), "stats": stats, "small": blockouts.too_small(stats)}
 
 
 def preview_project(film, opener_id):

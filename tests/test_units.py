@@ -1,5 +1,6 @@
 """The parts that need no server: lengths, the prompt check, the composer, the graphs, presets, beats."""
 import os
+import tempfile
 import json
 import unittest
 
@@ -402,9 +403,55 @@ class BlockoutScenes(unittest.TestCase):
                 blockouts.normalize(scene)
             self.assertIn(word, str(e.exception))
 
+    def test_pictures_and_sound_are_written_inside_the_studios_own_data_folder(self):
+        sub = config.out_sub("images")
+        self.assertTrue(os.path.realpath(os.path.join(config.OUTPUT_DIR, sub)).startswith(os.path.realpath(config.STUDIO_HOME)))
+        self.assertTrue(sub.endswith("/images") and not sub.startswith(".."))
+
+    def test_a_long_blockout_is_covered_in_parts_that_end_on_its_cuts(self):
+        total, cuts = 1369, [144, 240, 312, 384, 600, 706, 828, 1066, 1166]          # 57 s, nine cuts
+        for pos, cont in ((0, False), (345, True)):
+            parts = compose.blockout_parts(total, cuts, pos=pos, cont=cont)
+            covered = pos
+            for p in parts:
+                self.assertIn(p["frames"], lengths.usable(not p["new_shot"]))
+                self.assertLessEqual(p["frames"], compose.MAX_PART)
+                if p["new_shot"]:
+                    self.assertIn(p["start"], cuts + [0])                             # a new part opens on a cut
+                    self.assertLess(p["start"] - covered, 24)                          # nothing much is skipped
+                else:
+                    self.assertEqual(p["start"], covered - lengths.CONTEXT)            # a continuation reads on
+                covered = p["start"] + p["frames"]
+            self.assertGreater(covered, total - 24)                                    # to the end
+        self.assertEqual(len(compose.blockout_parts(total, cuts)), 5)
+        self.assertEqual(compose.blockout_parts(200, []), [{"start": 0, "frames": 192, "new_shot": True}])
+        long = compose.blockout_parts(1000, [])                                        # no cuts: one take in parts
+        self.assertEqual([p["new_shot"] for p in long], [True] + [False] * (len(long) - 1))
+
+    def test_a_blockout_video_that_cuts_is_followed_through_its_cuts(self):
+        d = tempfile.mkdtemp()
+        scene = {"things": [{"name": "Ann", "kind": "person", "color": "white", "keys": []},
+                            {"name": "the coupe", "kind": "coupe", "color": "black", "driver": "red", "keys": []}],
+                 "camera": {"keys": [{"t": 0, "cut": False}, {"t": 4, "cut": True}, {"t": 30, "cut": True}]}}
+        with open(os.path.join(d, "scene.json"), "w") as fh:
+            json.dump(scene, fh)
+        mp4 = os.path.join(d, "blockout.mp4")
+        open(mp4, "w").close()
+        ref = mp4                                       # an absolute path is read as it is
+        orig = compose.config.ref_path
+        compose.config.ref_path = lambda r: r
+        try:
+            film = {"bible": {"frames": 243}, "shots": [{"id": "s1", "blockout": ref, "frames": 243, "action": "They race."}]}
+            c = compose.compose(film, film["shots"][0], 0)
+        finally:
+            compose.config.ref_path = orig
+        self.assertIn("the white figure stands for Ann; the black coupe shape stands for the coupe, with someone at the wheel", c["prompt"])
+        self.assertIn("cuts to a new camera angle exactly where <Video 1> cuts (at 4 s) and nowhere else", c["prompt"])
+        self.assertNotIn("never cuts", c["prompt"])                     # the cut at 30 s is after this clip
+
     def test_a_scene_blockout_is_cut_into_its_shots(self):
         from studio import blockouts
-        self.assertEqual(compose.scene_shapes(SCENE), "the blue figure is Sam; the yellow car is taxi")
+        self.assertEqual(compose.scene_shapes(SCENE), "the blue figure stands for Sam; the yellow car shape stands for taxi")
         f = {**FILM, "bible": {**FILM["bible"], "frames": 243, "width": 1152, "height": 640},
              "shots": [dict(shot(id="a", scene="S")), dict(shot(id="b", scene="S", new_shot=False, frames=192)),
                        dict(shot(id="c", scene="S")), dict(shot(id="d", scene="T"))],
@@ -426,7 +473,7 @@ class BlockoutScenes(unittest.TestCase):
         c = compose.compose(f, f["shots"][2], 2)
         self.assertEqual((c["blockout"]["file"], c["blockout"]["start"]), ("b.mp4", 396))
         self.assertNotIn("blockout-start", [x["code"] for x in compose.compose(f, f["shots"][1], 1)["findings"]])   # same blockout as the shot before
-        self.assertIn("placeholders: the blue figure is Sam; the yellow car is taxi", c["prompt"])
+        self.assertIn("placeholders: the blue figure stands for Sam; the yellow car shape stands for taxi", c["prompt"])
         self.assertIsNone(compose.compose(f, f["shots"][3], 3)["blockout"])
         # a cut moved by hand moves the shots after it; a continuation always overlaps the shot before
         b["cuts"] = {"c": 420, "b": 5}

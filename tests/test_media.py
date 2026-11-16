@@ -39,6 +39,16 @@ class Checks(unittest.TestCase):
         self.assertLess(checks.keyframe_diff(a, pic), 12)
         self.assertGreater(checks.keyframe_diff(c, pic), 12)
 
+    def test_a_take_that_stays_the_grey_blockout_fails(self):
+        grey = media.clip(tmp("bo.mkv"), 3.0, "gray")
+        same = checks.review(media.clip(tmp("bo_same.mkv"), 2.0, "gray"), do_speech=False, blockout=True,
+                             blockout_file=grey, blockout_start=0.5)
+        self.assertFalse(same["ok"])
+        self.assertIn("still looks like the grey blockout", same["summary"])
+        painted = checks.review(media.clip(tmp("bo_real.mkv"), 2.0, "yellow"), do_speech=False, blockout=True,
+                                blockout_file=grey, blockout_start=0.5)
+        self.assertIn(("blockout look", "pass"), [(c["name"], c["status"]) for c in painted["checks"]])
+
     def test_loudness_only_counts_while_someone_speaks(self):
         quiet = checks.loudness(media.clip(tmp("quiet.mkv"), 3.0, volume=0.02))
         loud = checks.loudness(media.clip(tmp("loud.mkv"), 3.0, volume=6.0))     # ffmpeg's sine is 1/8 of full scale
@@ -58,6 +68,16 @@ class Checks(unittest.TestCase):
         self.assertIn("1 cut(s)", bad["summary"])
         asked = checks.review(tmp("r2.mkv"), do_speech=False, asks_for_cut=True)
         self.assertTrue(asked["ok"])                           # a prompt with [Shot 2] asked for the cut
+        follows = checks.review(tmp("r2.mkv"), do_speech=False, blockout=True, blockout_cuts=[1.4])
+        self.assertTrue(follows["ok"])                         # the blockout cuts there too
+        self.assertIn("where the blockout cuts", follows["summary"] + str(follows["checks"]))
+        jump_size = checks.find_cuts(tmp("r2.mkv"))[0][1]
+        elsewhere = checks.review(tmp("r2.mkv"), do_speech=False, blockout=True, blockout_cuts=[], thresholds={"cut": jump_size * 0.45})
+        self.assertFalse(elsewhere["ok"])                      # over twice the threshold where the blockout does not cut: a real cut
+        self.assertIn("where the blockout does not cut", elsewhere["summary"])
+        soft = checks.review(tmp("r2.mkv"), do_speech=False, blockout=True, blockout_cuts=[], thresholds={"cut": jump_size * 0.75})
+        self.assertTrue(soft["ok"])                            # under twice the threshold: maybe a fast blockout move, noted
+        self.assertIn("note", [c["status"] for c in soft["checks"] if c["name"] == "cuts"])
         jump = checks.review(media.clip(tmp("r3.mkv"), 2.0, "yellow"), continuation=True, prev_path=tmp("r1.mkv"), do_speech=False)
         self.assertFalse(jump["ok"])
         self.assertIn("the picture jumps at the join with the part before (difference", jump["summary"])
@@ -175,6 +195,21 @@ class Finish(unittest.TestCase):
                          [("0/24s", "12/24s", "48/24s"), ("48/24s", "0/24s", "72/24s")])
         self.assertEqual(x.getElementsByTagName("sequence")[0].getAttribute("duration"), "120/24s")
         self.assertEqual(len(x.getElementsByTagName("asset")), 2)
+
+    def test_a_silent_clip_takes_its_sound_from_another_file(self):
+        """Upscaled parts are picture only; their timeline clip names the original part as its sound."""
+        pic = media.clip(config.home("exports", "ws_pic.mkv"), 2.0, "blue", audio=False)
+        snd = media.clip(config.home("exports", "ws_snd.mkv"), 2.0, "red", volume=1.0)
+        tl = finish.blank("Sound from elsewhere")
+        c = finish.add_clip(tl, path=pic)
+        self.assertFalse(finish.resolve_clips(tl)[0][2]["has_audio"])
+        c["sound"] = os.path.relpath(snd, config.OUTPUT_DIR)
+        _, path, info = finish.resolve_clips(tl)[0]
+        self.assertTrue(info["has_audio"])
+        self.assertAlmostEqual(info["duration"], 2.0, delta=0.1)
+        self.assertEqual(finish.resolve_clips(tl)[0][1], path)          # muxed once, then reused
+        c["sound"] = "nowhere.mkv"
+        self.assertEqual(finish.resolve_clips(tl)[0][1], pic)           # a missing sound file leaves the clip as it is
 
     def test_prores_copy_and_conform_back(self):
         src = media.clip(config.home("exports", "pr_src.mp4"), 1.0, "red")

@@ -84,6 +84,12 @@ ROOMS.picture = { title: "Image", full: true, draw(root) {
     toast("The settings of that picture are filled in" + (r.seed ? " (same seed)" : ""));
   }
   if (pend.attach) { f.attach = pend.attach.slice(0, 9); f.mode = "edit"; }
+  if (pend.template) {        // from a film's cast or places ("Invent one", "Make one"): the mode, size, takes and words
+    f.mode = { portrait: "face", location: "place" }[pend.template] || "make";
+    if (pend.width && pend.height) f.size = pend.width + "x" + pend.height;
+    f.takes = pend.takes || f.takes; f.prompt = pend.prompt || ""; f.attach = []; f.seed = 0;
+  }
+  const back = pend.back ? h("button", { class: "small", onclick: () => go(...pend.back) }, "← Back to " + (pend.backLabel || "the film")) : null;
   ROOMS.picture.keep = f;
   const mine = new Set();
   const results = h("div", { class: "results" });
@@ -154,7 +160,7 @@ ROOMS.picture = { title: "Image", full: true, draw(root) {
       return;
     }
     results.replaceChildren(pend, items.map(a => post(a)));
-    stage.replaceChildren(h("div", { class: "section-head" }, h("h2", {}, "Your pictures"), h("span", { class: "muted small" }, items.length + " in the Library")), results);
+    stage.replaceChildren(h("div", { class: "section-head" }, h("h2", {}, "Your pictures"), back, h("span", { class: "muted small" }, items.length + " in the Library")), results);
   }
   onJobEnd(j => { if (j.kind === "image") load(); });
   const wrap = h("div", { class: "studio", style: { height: "100%", position: "relative" } }, stage, bar);

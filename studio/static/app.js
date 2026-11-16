@@ -29,11 +29,22 @@ for (const m of ["replaceChildren", "append", "prepend"]) {
   Element.prototype[m] = function (...kids) { return orig.apply(this, flatKids(kids)); };
 }
 
+// The page's build (the server sends it with every answer). When it changes, the studio was updated after this page
+// was loaded: its code may not fit the server any more, so it stops saving and asks for a reload.
+let PAGE_BUILD = null, STALE = false;
+function pageIsStale() {
+  if (STALE) return; STALE = true;
+  document.body.prepend(h("div", { class: "stalebar" }, "The studio was updated while this page was open. Reload the page (F5) before you change anything; until then nothing is saved.",
+    h("button", { class: "small primary", onclick: () => location.reload() }, "Reload")));
+}
 async function api(path, data, method) {
   const opt = { method: method || (data === undefined ? "GET" : "POST"), headers: {} };
   if (data !== undefined) { opt.headers["Content-Type"] = "application/json"; opt.body = JSON.stringify(data); }
+  if (STALE && opt.method !== "GET") throw new Error("the studio was updated: reload the page (F5) first");
   let r;
   try { r = await fetch(path, opt); } catch (e) { throw new Error("the studio does not answer"); }
+  const build = r.headers.get("X-Studio-Build");
+  if (build) { if (PAGE_BUILD === null) PAGE_BUILD = build; else if (build !== PAGE_BUILD) pageIsStale(); }
   const text = await r.text();
   let out;
   try { out = text ? JSON.parse(text) : {}; } catch (e) { out = { error: text.slice(0, 300) }; }
@@ -77,11 +88,12 @@ const S = {
   room: "home", arg: "", presets: null, state: { comfy: { up: false }, jobs: [], gate: [], busy: {} },
   pending: null,            // a form an app or a Library action hands to the next room
   watchers: [],             // room callbacks when a job ends: fn(job)
+  pollers: [],              // [element, fn]: called after every poll while the element is on the page (live progress)
   seen: {},                 // job id -> last status, to notice endings
 };
 const ROOMS = {};           // name -> {title, draw(root, arg)}
 // The top bar: the studios a thing is made in, then the film rooms; everything else is under More.
-const NAV = [["home", "Explore"], ["picture", "Image"], ["video", "Video"], ["audio", "Audio"], ["remix", "Remix", "New"], ["shorts", "Shorts", "New"], "|",
+const NAV = [["home", "Explore"], ["picture", "Image"], ["video", "Video"], ["blockout", "Blockout", "New"], ["audio", "Audio"], ["remix", "Remix", "New"], ["shorts", "Shorts", "New"], "|",
   ["writer", "Writer"], ["films", "Films"], ["agent", "Agent", "New"], ["canvas", "Canvas"], ["apps", "Apps"]];
 const MORE = [
   ["Make", [["edit", "Edit a picture", "◩"], ["nightshift", "Night shift", "☾"], ["cast", "Cast library", "☺"]]],
@@ -165,12 +177,13 @@ function jobCard(j) {
   }
   let line = j.status === "running" ? (p.text || "working") : j.status === "queued" ? "waiting" : j.status === "failed" ? (j.error || "failed") : j.status === "cancelled" ? "cancelled" :
     (res.summary || res.note || (res.seconds ? (j.kind === "export" ? "done: a cut of " : "done in ") + secs(res.seconds) : "done"));
+  if (j.status === "running" && p.max) line += " " + (p.value || 0) + "/" + p.max;
   if (j.status === "running" && j.eta) { const left = j.eta - Date.now() / 1000; if (left > 5) line += " · about " + secs(left) + " left"; }
   return h("div", { class: "job " + j.status },
     h("div", { class: "t" }, h("b", { title: j.title }, j.title),
       h("button", { class: "ghost small", title: live ? "Cancel" : "Remove from the list", "aria-label": live ? "Cancel" : "Remove", onclick: async () => { await tryApi("/api/jobs/" + j.id, undefined, "DELETE"); poll(); } }, "✕")),
     j.status === "running" ? h("div", { class: "bar" + (p.max ? "" : " busy") }, h("i", { style: p.max ? { width: Math.round(100 * (p.value || 0) / p.max) + "%" } : {} })) : null,
-    h("div", { class: "s" }, line, p.max && j.status === "running" ? " " + p.value + "/" + p.max : "",
+    h("div", { class: "s" }, line,
       j.status === "done" && res.ok === false ? h("span", { class: "chip bad", style: { marginLeft: "6px" } }, "check failed") : null),
     links.length ? h("div", { class: "row", style: { marginTop: "6px", gap: "6px" } }, links) : null);
 }
@@ -220,6 +233,8 @@ async function poll() {
       }
     }
     drawQueue();
+    S.pollers = S.pollers.filter(([el]) => el.isConnected);
+    for (const [, fn] of S.pollers) { try { fn(st); } catch (e) { console.error(e); } }
     const live = st.jobs.filter(j => j.status === "running" || j.status === "queued").length;
     if (gateChanged || live !== S.live) { S.live = live; drawSide(); }
   } catch (e) {
@@ -229,6 +244,7 @@ async function poll() {
   pollTimer = setTimeout(poll, busy ? 1200 : 4000);
 }
 function onJobEnd(fn) { S.watchers.push(fn); }
+function onPoll(el, fn) { S.pollers.push([el, fn]); fn(S.state); }      // fn(state) after each poll while el is shown
 
 // ---------------------------------------------------------------- ComfyUI's terminal output, in the bottom half
 // A switch in the menu. The studio's server hands over what ComfyUI printed last (or, while ComfyUI is loading or after

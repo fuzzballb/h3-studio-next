@@ -26,8 +26,9 @@ from . import config
 SKIES = ("day", "dusk", "night", "indoor")
 GROUNDS = ("grass", "snow", "asphalt", "sand", "floor", "water", "none")
 SET_TYPES = ("street", "room", "building", "city", "box", "wall", "cylinder", "ball", "cone", "tree")
-KINDS = ("person", "child", "cyclist", "car", "van", "truck", "bus", "tram", "train", "bike", "horse", "dog", "animal", "bird",
+KINDS = ("person", "child", "cyclist", "car", "coupe", "sports car", "suv", "pickup", "van", "truck", "bus", "tram", "train", "bike", "horse", "dog", "animal", "bird",
          "box", "ball", "sled", "boat", "plane")
+CARS = ("car", "coupe", "sports car", "suv", "pickup")        # built from static/car_shapes.json; they can have a driver
 POSES = ("stand", "walk", "run", "sit", "lie", "crouch", "look_up", "look_down", "wave")
 LIMITS = {"set": 120, "things": 30, "keys": 60, "coord": 3000.0}
 # what a set item's size means when none is given (and what its "at" is)
@@ -44,8 +45,8 @@ _SET = {"type": "object", "additionalProperties": False, "required": ["type", "n
 _KEY = {"type": "object", "additionalProperties": False, "required": ["t", "at", "face", "pose"],
         "properties": {"t": _NUM, "at": _XYZ, "face": {"anyOf": [_NUM, {"type": "null"}]},
                        "pose": {"type": "string", "enum": list(POSES)}}}
-_THING = {"type": "object", "additionalProperties": False, "required": ["name", "kind", "color", "scale", "keys"],
-          "properties": {"name": _STR, "kind": {"type": "string", "enum": list(KINDS)}, "color": _STR, "scale": _NUM,
+_THING = {"type": "object", "additionalProperties": False, "required": ["name", "kind", "color", "scale", "driver", "keys"],
+          "properties": {"name": _STR, "kind": {"type": "string", "enum": list(KINDS)}, "color": _STR, "scale": _NUM, "driver": _STR,
                          "keys": {"type": "array", "items": _KEY}}}
 _CAMKEY = {"type": "object", "additionalProperties": False, "required": ["t", "at", "look_at", "follow", "lens", "cut"],
            "properties": {"t": _NUM, "at": _XYZ, "look_at": _XYZ, "follow": _STR, "lens": _NUM, "cut": {"type": "boolean"}}}
@@ -72,7 +73,7 @@ there instead of moving. On the shots of a scene with a blockout leave "framing"
 them) and still write in "action" who and what everything is and what happens.
 
 Units are metres and seconds; z is up; the ground is z = 0; angles are degrees; a facing of 0 looks along +x and 90
-along +y. A person is 1.75 m tall; a car 4.4 x 1.8 x 1.45 m.
+along +y. A person is 1.75 m tall; a car 4.7 x 1.8 x 1.45 m (a sports car 4.5 x 1.95 x 1.2, an suv 4.8 x 1.95 x 1.75, a pickup 5.4 x 2 x 1.85).
 - "sky": day, dusk, night or indoor. "ground": grass, snow, asphalt, sand, floor, water or none.
 - "set" (does not move): street (along +x from "at", size = [length, width of the road, house height]; houses with
   windows on both sides of the road at y = at.y +- (width/2 + 2.4)), room (at = middle of the floor, size = [width,
@@ -81,9 +82,13 @@ along +y. A person is 1.75 m tall; a car 4.4 x 1.8 x 1.45 m.
   wall, cylinder, ball, cone, tree (at = the middle of its base, size = [x, y, height]). "turn" rotates it about z.
   "color": a name (red, dark red, orange, yellow, gold, green, dark green, blue, light blue, navy, purple, pink, white,
   grey, dark grey, black, brown, light brown, beige, brick, stone, wood, glass, silver) or #rrggbb.
-- "things" (can move): kind person, child, cyclist (a person riding a bike), car, van, truck, bus, tram (30 m),
+- "things" (can move): kind person, child, cyclist (a person riding a bike), car (a saloon), coupe, sports car (low and
+  wide, with a spoiler), suv, pickup, van, truck, bus, tram (30 m),
   train, bike (with nobody on it), horse, dog, animal, bird, box, ball, sled, boat or plane; "scale" 1 = normal
-  size. Parked cars and other vehicles that do not move are things with one key, so they look like what they are. "keys": where it is at which second ("at" on the ground for people and
+  size. Cars have see-through windows, seats and a steering wheel: "driver" is the colour of the clothes of someone
+  driving it (seated, hands on the wheel, seen through the windows and moving with the car), or "" for nobody. A driver
+  is part of the car, never a separate person thing. Give two cars that must look different different kinds and
+  colours. Parked cars and other vehicles that do not move are things with one key, so they look like what they are. "keys": where it is at which second ("at" on the ground for people and
   vehicles), its "face" in degrees or null to face the way it moves, and its "pose": stand, walk, run, sit, lie,
   crouch, look_up, look_down or wave. Between keys it moves smoothly; walking legs follow the speed (walk about 1.4
   m/s, run 4, a car in town 8 to 14). Give a key at the start and the end of the take; a thing that stops gets two
@@ -203,7 +208,8 @@ def normalize(scene):
                        "face": None if face is None else _num(face, f"{what} key {j + 1} face", -720, 720), "pose": pose})
         ks.sort(key=lambda k: k["t"])
         out["things"].append({"name": name, "kind": kind, "color": _text(th.get("color"), 20),
-                              "scale": _num(th.get("scale"), what + " scale", 0.05, 50, 1.0) or 1.0, "keys": ks})
+                              "scale": _num(th.get("scale"), what + " scale", 0.05, 50, 1.0) or 1.0,
+                              "driver": _text(th.get("driver"), 20) if kind in CARS else "", "keys": ks})
     cam = scene.get("camera") or {}
     ck = cam.get("keys") or []
     if not ck:

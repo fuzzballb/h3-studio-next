@@ -43,7 +43,11 @@ async function drawFilm(root, arg) {
   const body = h("div", {}), tabBar = h("div", {}), saveNote = h("span", { class: "muted small" });
   let machine = { loras: [], roles: [] };
   // the list of LoRAs comes after the first draw: a dropdown always offers the file it holds, and is filled when the list is there
-  getMachine().then(m => { machine = m; if (["cast", "bible", "shots"].includes(ui.tab) && !["INPUT", "TEXTAREA", "SELECT"].includes((document.activeElement || {}).tagName)) draw(); }).catch(() => {});
+  // while ComfyUI is down or starting the list is empty: ask again until it is up (or this film page is left)
+  const loadMachine = () => getMachine().then(m => { machine = m; if (["cast", "bible", "shots"].includes(ui.tab) && !["INPUT", "TEXTAREA", "SELECT"].includes((document.activeElement || {}).tagName)) draw();
+    if (!(m.comfy && m.comfy.up)) setTimeout(() => body.isConnected && loadMachine(), 5000); })
+    .catch(() => setTimeout(() => body.isConnected && loadMachine(), 5000));
+  loadMachine();
 
   // -------- saving: what the user edits is merged into the film; the runner's own fields stay the server's
   const save = debounce(async () => {
@@ -126,8 +130,12 @@ async function drawFilm(root, arg) {
         h("div", { class: "field" }, h("label", {}, "Outfit sheet"), refPicker(c, "body", { onchange: edited, empty: "whole body, several views", makeLabel: "From the face", make: () => c.face ? go("edit", "", { picture: c.face, angles: "sheet", back: ["films", film.id + "/cast"], backLabel: "the cast of " + film.name }) : toast("Pick the face first", true) })),
         h("div", { class: "field" }, h("label", {}, "Voice sample"), refPicker(c, "voice", { kind: "audio", onchange: edited, empty: "10–20 s of clean speech" }))),
       h("div", { class: "row" },
-        h("div", { class: "field" }, h("label", {}, "Person LoRA"), (() => { c.lora = c.lora || {}; return select(c.lora, "file", [["", "(none)"], ...[...new Set([c.lora.file, ...machine.loras].filter(Boolean))].map(l => [l, l])], { onchange: edited }); })()),
-        h("div", { class: "field fit" }, h("label", {}, "Strength"), number(c.lora, "strength", { min: 0, max: 2, step: 0.05, oninput: edited, placeholder: "1.0" }))));
+        h("div", { class: "field" }, h("label", {}, "Person LoRA"), (() => { c.lora = c.lora || {}; return select(c.lora, "file", [["", "(none)"], ...[...new Set([c.lora.file, ...machine.loras].filter(Boolean))].map(l => [l, l])],
+          // a person LoRA gave a rough voice that only words took away: picked without a voice sample, they are filled in
+          { onchange: v => { if (v && !c.voice && !(c.voice_words || "").trim()) { c.voice_words = CLEAR_VOICE; draw(); } edited(); } }); })()),
+        h("div", { class: "field fit" }, h("label", {}, "Strength"), number(c.lora, "strength", { min: 0, max: 2, step: 0.05, oninput: edited, placeholder: "1.0" }))),
+      h("div", { class: "field" }, h("label", {}, "How the voice sounds (said with every line)"),
+        text(c, "voice_words", { oninput: edited, placeholder: "e.g. speaking in a clear, smooth, warm voice without any rasp or hoarseness" })));
     const place = (l, i) => h("div", { class: "person" },
       h("div", { class: "row" }, h("div", { class: "field" }, h("label", {}, "Name"), text(l, "name", { oninput: edited })),
         h("div", { class: "field fit" }, h("button", { class: "ghost small", onclick: () => { film.locations.splice(i, 1); edited(); draw(); } }, "Remove"))),
@@ -609,6 +617,8 @@ async function drawFilm(root, arg) {
 }
 
 // ---------------------------------------------------------------- Cast library
+const CLEAR_VOICE = "speaking in a clear, smooth, warm voice without any rasp or hoarseness";
+
 ROOMS.cast = { title: "Cast", async draw(root) {
   let cast = (await tryApi("/api/cast")) || [];
   const box = h("div", {}), note = h("span", { class: "muted small" });

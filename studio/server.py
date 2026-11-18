@@ -1347,7 +1347,19 @@ async def writer_apply(request):
         b = blockouts.find(film, bid)
         if b:
             queue_blockout(st, film, b)
+    for pid in report.get("props") or []:              # and a reference picture for each prop that has none
+        p = next((x for x in film["props"] if x["id"] == pid), None)
+        if p:
+            st.queue.add("image", {"prompt": p["description"], "name": "ref " + p["name"][:40], "takes": 1,
+                                   "film": film["id"], "prop": pid}, title=f"Prop picture · {p['name'][:48]}")
     return ok({"film": film_view(film), "report": report, "conversation": writer.load(cid)})
+
+
+@routes.get("/api/writer-rules")
+async def writer_rules(request):
+    """The Writer's house rules: {"rules": what it is given, "default": the studio's own, "custom": changed or not}."""
+    own = (config.settings()["writer"].get("rules") or "").strip()
+    return ok({"rules": own or writer.DEFAULT_RULES, "default": writer.DEFAULT_RULES, "custom": bool(own) and own != writer.DEFAULT_RULES.strip()})
 
 
 @routes.delete("/api/writer/{cid}")

@@ -135,7 +135,7 @@ def clip(roles, *, project, part, prompt, new_shot=True, width=1152, height=640,
 
 def blockout_clip(roles, *, project, part, prompt, blockout, start=0, strength=0.997, new_shot=True, width=1152,
                   height=640, frames=243, seed=0, turbo=True, refs=(), voices=(), loras=(), unet=None, steps=None,
-                  preview=True, crf=14, video=None, sampler="er_sde", scheduler="beta", ref_scale=0.5):
+                  preview=True, crf=14, video=None, sampler="res_multistep", scheduler="simple", ref_scale=0.5):
     """One part that follows a blockout: a rough 3D render (or any video) whose camera, framing, positions and timing
     the part keeps, with real pictures in place of its shapes. H3 V2V: the blockout's frames from `start` are encoded and
     noised to `strength` (H3V2VGranularFractionalDenoise) and are also shown to the model as <Video 1>.

@@ -28,17 +28,21 @@ _SHOT_PROPS = {
     "framing": _STR, "camera": _STR, "action": _STR, "lines": {"type": "array", "items": _LINE}, "sound": _STR,
     "seconds": {"type": "number"}, "prompt": _STR}
 _SHOT = {"type": "object", "additionalProperties": False, "required": list(_SHOT_PROPS), "properties": _SHOT_PROPS}
-_PERSON = {"type": "object", "additionalProperties": False, "required": ["name", "pronoun", "description"],
-           "properties": {"name": _STR, "pronoun": {"type": "string", "enum": ["his", "her", "their"]}, "description": _STR}}
+_PERSON = {"type": "object", "additionalProperties": False, "required": ["name", "pronoun", "description", "voice_words"],
+           "properties": {"name": _STR, "pronoun": {"type": "string", "enum": ["his", "her", "their"]}, "description": _STR,
+                          "voice_words": _STR}}
+_PROP = {"type": "object", "additionalProperties": False, "required": ["name", "description", "token"],
+         "properties": {"name": _STR, "description": _STR, "token": _STR}}
 _PLACE = {"type": "object", "additionalProperties": False, "required": ["name", "description"],
           "properties": {"name": _STR, "description": _STR}}
 _QUESTION = {"type": "object", "additionalProperties": False, "required": ["id", "question", "options"],
              "properties": {"id": _STR, "question": _STR, "options": {"type": "array", "items": _STR}}}
 _BLOCKOUT = {"type": "object", "additionalProperties": False, "required": ["scene", "why", "blockout"],
              "properties": {"scene": _STR, "why": _STR, "blockout": {"anyOf": [blockouts.SCHEMA, {"type": "null"}]}}}
-_FILM = {"type": "object", "additionalProperties": False, "required": ["name", "logline", "look", "cast", "locations", "shots", "blockouts"],
+_FILM = {"type": "object", "additionalProperties": False, "required": ["name", "logline", "look", "cast", "locations", "props", "shots", "blockouts"],
          "properties": {"name": _STR, "logline": _STR, "look": _STR, "cast": {"type": "array", "items": _PERSON},
-                        "locations": {"type": "array", "items": _PLACE}, "shots": {"type": "array", "items": _SHOT},
+                        "locations": {"type": "array", "items": _PLACE}, "props": {"type": "array", "items": _PROP},
+                        "shots": {"type": "array", "items": _SHOT},
                         "blockouts": {"type": "array", "items": _BLOCKOUT}}}
 _UPDATE = {"type": "object", "additionalProperties": False, "required": ["id", "why", "changes"],
            "properties": {"id": _STR, "why": _STR,
@@ -46,13 +50,41 @@ _UPDATE = {"type": "object", "additionalProperties": False, "required": ["id", "
                                       "properties": {k: v for k, v in _SHOT_PROPS.items()}}}}
 _ADD = {"type": "object", "additionalProperties": False, "required": ["after", "why", "shot"],
         "properties": {"after": _STR, "why": _STR, "shot": _SHOT}}
-_EDITS = {"type": "object", "additionalProperties": False, "required": ["cast", "locations", "update", "add", "remove", "blockouts"],
+_EDITS = {"type": "object", "additionalProperties": False, "required": ["cast", "locations", "props", "update", "add", "remove", "blockouts"],
           "properties": {"cast": {"type": "array", "items": _PERSON}, "locations": {"type": "array", "items": _PLACE},
+                         "props": {"type": "array", "items": _PROP},
                          "update": {"type": "array", "items": _UPDATE}, "add": {"type": "array", "items": _ADD},
                          "remove": {"type": "array", "items": _STR}, "blockouts": {"type": "array", "items": _BLOCKOUT}}}
 SCHEMA = {"type": "object", "additionalProperties": False, "required": ["say", "questions", "film", "edits"],
           "properties": {"say": _STR, "questions": {"type": "array", "items": _QUESTION},
                          "film": {"anyOf": [_FILM, {"type": "null"}]}, "edits": {"anyOf": [_EDITS, {"type": "null"}]}}}
+
+
+# The Writer's house rules: sent with the system prompt every time, and changed in the Writer's settings (settings
+# "writer"."rules"; "" = these). Each one comes from a film that went wrong (2026-11-18, a Christmas film: the shoppers,
+# presents and sleigh of its blockouts had no pictures and came out as coloured dolls and blocks; the person LoRA's voice
+# had a rasp, which the words below took away in an earlier film).
+DEFAULT_RULES = """1. Pictures for everything that is not cast. Every group of extras (shoppers, passers-by, an audience, guests, police
+   officers) and every object that is seen in more than one shot or matters to the story (presents, a parcel, a car, a
+   sleigh, a bike) gets a prop. Without a picture the video model paints them as the blockout's coloured dolls and grey
+   blocks, and lowering the blockout strength is no cure (the shot then stops doing what the blockout does).
+   - "description" is the prompt of the prop's reference picture: "A real photograph of ... on a plain white studio
+     background, soft even studio light, photorealistic", naming each member of the group (in the colours their blockout
+     figures have) or each object, whole and side by side, with real textures. No text or logos.
+   - "token" is one short upper-case word in angle brackets, like <SHOPPERS>, <PRESENTS> or <SLEIGH>.
+   - Put a sentence with the token in the "action" of every shot in which they are seen, for example "The shoppers are
+     real people in real winter clothes, the people from <SHOPPERS>." or "The sleigh is exactly the sleigh in <SLEIGH>,
+     a real one." The main characters are cast, never props.
+2. A clear voice. Give "voice_words" to every person played by a person LoRA (a "lora" in the film you are shown, or one
+   the user names) and to anyone the user says plays themselves, unless the user asks for another voice:
+   "speaking in a clear, smooth, warm voice without any rasp or hoarseness"
+   The studio says it with each of their lines; do not repeat it in "how". Everyone else gets "" unless their voice
+   matters to the story."""
+
+
+def rules():
+    """The house rules the Writer is given: the user's own (settings) or DEFAULT_RULES."""
+    return (config.settings()["writer"].get("rules") or "").strip() or DEFAULT_RULES
 
 
 def system_prompt():
@@ -94,10 +126,15 @@ The fields of a shot:
   changes, and "blockout": null to remove one. See "Blockouts" below.
 - "look" of a new film: one of {json.dumps([s["id"] for s in looks["styles"]])}.
 - A person's "description": age, face, hair, clothes, in one sentence. A place's: the empty place as the camera sees it,
-  with its light.
+  with its light. A person's "voice_words": how their voice sounds, said with every line they speak ("" for none).
+- "props" (of a film, and in edits): {{"name", "description": the prompt of its reference picture, "token"}}; a shot shows
+  a prop by its token in "action". In edits, list only new props or ones whose words change.
 
 Blockouts:
 {blockouts.GUIDE}
+
+House rules of this studio (follow them every time you write or change a film):
+{rules()}
 
 Keep to the studio's prompting guide below; every rule in it comes from a render that went wrong.
 
@@ -174,10 +211,12 @@ def film_words(film):
     b = film["bible"]
     return json.dumps({"name": film["name"], "logline": b.get("logline", ""), "look": b.get("look", ""), "style": b.get("style", ""),
                        "cast": [{"name": c["name"], "pronoun": c.get("pronoun", "their"), "description": c.get("description", ""),
-                                 "has_face_picture": bool(c.get("face"))} for c in film["cast"]],
+                                 "has_face_picture": bool(c.get("face")), "lora": (c.get("lora") or {}).get("file", ""),
+                                 "has_voice_sample": bool(c.get("voice")), "voice_words": c.get("voice_words", "")} for c in film["cast"]],
                        "locations": [{"name": l["name"], "description": l.get("description", ""), "has_plate": bool(l.get("plate"))}
                                      for l in film["locations"]],
-                       "props": [{"name": p.get("name", ""), "token": p.get("token", "")} for p in film["props"]],
+                       "props": [{"name": p.get("name", ""), "token": p.get("token", ""), "description": p.get("description", ""),
+                                  "has_picture": bool(p.get("sheet"))} for p in film["props"]],
                        "shots": shots,
                        "blockouts": [{"scene": bo.get("scene_name", ""), "blockout": bo.get("scene"),
                                       "made": blockouts.state_of(film, bo)["current"],
@@ -314,7 +353,7 @@ def clean(a):
                                      "options": [str(o) for o in (q.get("options") or [])][:6]})
     if isinstance(a.get("film"), dict) and a["film"].get("shots"):
         out["film"] = a["film"]
-    elif isinstance(a.get("edits"), dict) and any(a["edits"].get(k) for k in ("cast", "locations", "update", "add", "remove")):
+    elif isinstance(a.get("edits"), dict) and any(a["edits"].get(k) for k in ("cast", "locations", "props", "update", "add", "remove")):
         out["edits"] = a["edits"]
     return out
 
@@ -409,9 +448,12 @@ def _people_and_places(film, cast, locations):
         c = next((x for x in film["cast"] if x["name"] == p.get("name")), None)
         if c is None:
             film["cast"].append({"id": uuid.uuid4().hex[:8], "name": p["name"], "pronoun": p.get("pronoun") or "their",
-                                 "description": p.get("description", ""), "face": "", "body": "", "voice": "", "lora": {}})
+                                 "description": p.get("description", ""), "face": "", "body": "", "voice": "", "lora": {},
+                                 "voice_words": str(p.get("voice_words") or "").strip()})
         else:
             c["description"] = p.get("description") or c.get("description", "")
+            if str(p.get("voice_words") or "").strip():
+                c["voice_words"] = str(p["voice_words"]).strip()
             c["pronoun"] = p.get("pronoun") if p.get("pronoun") in compose.PRONOUNS else c.get("pronoun", "their")
     for l in locations or []:
         x = next((y for y in film["locations"] if y["name"] == l.get("name")), None)
@@ -419,6 +461,31 @@ def _people_and_places(film, cast, locations):
             film["locations"].append({"id": uuid.uuid4().hex[:8], "name": l["name"], "description": l.get("description", ""), "plate": ""})
         else:
             x["description"] = l.get("description") or x.get("description", "")
+
+
+def _token(t, name):
+    """A prop token as the studio uses it: <WORD>, upper case."""
+    import re
+    w = re.sub(r"[^A-Z0-9_]", "", (t or "").upper()) or re.sub(r"[^A-Z0-9]", "", (name or "PROP").upper())[:12] or "PROP"
+    return f"<{w}>"
+
+
+def _set_props(film, items, report):
+    """The Writer's props into the film, by token (then name). A prop without a picture is reported in
+    report["props"]: the studio makes its reference picture from the description."""
+    for it in items or []:
+        if not isinstance(it, dict) or not (it.get("name") or it.get("token")):
+            continue
+        tok = _token(it.get("token"), it.get("name"))
+        p = next((x for x in film["props"] if x.get("token") == tok), None) or \
+            next((x for x in film["props"] if it.get("name") and x.get("name") == it.get("name")), None)
+        if p is None:
+            p = {"id": uuid.uuid4().hex[:8], "name": "", "token": tok, "sheet": "", "description": ""}
+            film["props"].append(p)
+        p["name"] = str(it.get("name") or p.get("name") or tok.strip("<>").lower())
+        p["description"] = str(it.get("description") or p.get("description") or "")
+        p.setdefault("token", tok)
+    report["props"] = [p["id"] for p in film["props"] if not p.get("sheet") and (p.get("description") or "").strip()]
 
 
 def apply(cid, n):
@@ -430,7 +497,7 @@ def apply(cid, n):
     a = c["turns"][n]["answer"]
     if c["turns"][n].get("applied"):
         raise ValueError("this proposal was applied already")
-    report = {"made": False, "updated": [], "added": [], "removed": [], "rerender": []}
+    report = {"made": False, "updated": [], "added": [], "removed": [], "rerender": [], "props": []}
     if a.get("film"):
         p = a["film"]
         look = p.get("look") if presets.find("looks", "styles", p.get("look") or "") else "cinematic"
@@ -438,6 +505,7 @@ def apply(cid, n):
         with films.LOCK:
             film = films.load(film["id"])
             _people_and_places(film, p.get("cast"), p.get("locations"))
+            _set_props(film, p.get("props"), report)
             for i, s in enumerate(p["shots"]):
                 cont = i > 0 and not s.get("new_shot", True)
                 films.new_shot(film, **_shot_fields(s, film, cont))
@@ -453,6 +521,7 @@ def apply(cid, n):
             if not film:
                 raise ValueError("this conversation has no film to change")
             _people_and_places(film, e.get("cast"), e.get("locations"))
+            _set_props(film, e.get("props"), report)
             by_id = {s["id"]: s for s in film["shots"]}
             for u in e.get("update") or []:
                 s = by_id.get(u.get("id"))

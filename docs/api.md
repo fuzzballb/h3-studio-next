@@ -103,7 +103,8 @@ A conversation with Claude through the Claude Code program on this computer (`cl
 | GET, POST | `/api/writer` | `{state, conversations}`; POST `{film}` starts a conversation (about that film, or a new one). |
 | GET, DELETE | `/api/writer/{id}` | One conversation: `{id, film, turns: [{role: user, text} \| {role: writer, answer: {say, questions, film, edits}, meta, applied}]}`. DELETE moves it to the trash. |
 | POST | `/api/writer/{id}/say` | `{text}`: a turn. Waits for the answer (a whole film took 39 s). |
-| POST | `/api/writer/{id}/apply` | `{turn}`: make the proposed film, or apply the proposed edits to the film. Returns `{film, report: {made, updated, added, removed, rerender}, conversation}`. |
+| POST | `/api/writer/{id}/apply` | `{turn}`: make the proposed film, or apply the proposed edits to the film. Returns `{film, report: {made, updated, added, removed, rerender, props}, conversation}`; a reference picture is queued for each prop in `props` (one without a picture) and set as its sheet when it is made. |
+| GET | `/api/writer-rules` | `{rules, default, custom}`: the house rules the Writer gets with its system prompt. Change them with `PUT /api/settings {"writer": {"rules": "..."}}` (`""` = the studio's own). |
 
 ### Films
 

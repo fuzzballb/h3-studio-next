@@ -67,7 +67,10 @@ const sizeOptions = () => P().sizes.map(s => [s.width + "x" + s.height, s.name])
 // ---------------------------------------------------------------- machine facts, fetched once
 let machinePromise = null;
 function getMachine(refresh) {
-  if (!machinePromise || refresh) machinePromise = api("/api/machine" + (refresh ? "?refresh=1" : "")).catch(e => { machinePromise = null; throw e; });
+  if (!machinePromise || refresh) machinePromise = api("/api/machine" + (refresh ? "?refresh=1" : ""))
+    // keep the answer only while ComfyUI is up: one fetched while it was down or starting has no models or LoRAs
+    .then(m => { if (!(m.comfy && m.comfy.up)) machinePromise = null; return m; })
+    .catch(e => { machinePromise = null; throw e; });
   return machinePromise;
 }
 

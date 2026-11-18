@@ -29,7 +29,32 @@ ROOMS.writer = { title: "Writer", async draw(root, arg) {
       (() => { const pick = { f: "" }; return select(pick, "f", [["", "(choose a film)"], ...filmsList.filter(f => !f.quick).map(f => [f.id, f.name])], { onchange: v => v && go("writer", "film/" + v) }); })()) : null,
     h("h3", { style: { marginTop: "14px" } }, "Conversations"),
     data.conversations.length ? data.conversations.map(c => h("button", { class: "nav" + (c.id === cid ? " on" : ""), style: { width: "100%", textAlign: "left", overflow: "hidden" }, title: (c.title || "(empty)") + (c.film ? " · " + filmName(c.film) : ""), onclick: () => go("writer", c.id) },
-      h("span", { class: "label", style: { display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 } }, (c.title || "(empty)") + (c.film ? " · " + filmName(c.film) : "")))) : h("div", { class: "faint small" }, "None yet."));
+      h("span", { class: "label", style: { display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 } }, (c.title || "(empty)") + (c.film ? " · " + filmName(c.film) : "")))) : h("div", { class: "faint small" }, "None yet."),
+    rulesBox());
+
+  // the Writer's house rules: added to its system prompt every time; the studio's own until they are changed here
+  function rulesBox() {
+    const box = h("details", { class: "rules", style: { marginTop: "14px" } }, h("summary", { class: "small", style: { cursor: "pointer" } }, "Writer rules"));
+    const r = { rules: "" }, note = h("span", { class: "muted small" });
+    let def = "";
+    const area = h("textarea", { rows: 14, class: "mono small", style: { width: "100%" }, "aria-label": "The Writer's house rules" });
+    const save = async text => {
+      const out = await tryApi("/api/settings", { writer: { rules: text.trim() === def.trim() ? "" : text } }, "PUT");
+      if (out) note.textContent = text.trim() === def.trim() ? "the studio's own rules" : "your rules: used from the next answer on";
+    };
+    box.addEventListener("toggle", async () => {
+      if (!box.open || def) return;
+      const got = await tryApi("/api/writer-rules");
+      if (!got) return;
+      def = got.default; area.value = got.rules;
+      note.textContent = got.custom ? "your rules" : "the studio's own rules";
+    }, { once: false });
+    box.append(h("div", { class: "hint", style: { margin: "6px 0" } }, "Sent with the Writer's instructions every time it writes or changes a film. Each rule comes from a render that went wrong."),
+      area, h("div", { class: "row", style: { gap: "6px", marginTop: "6px", alignItems: "center" } },
+        h("button", { class: "small primary", onclick: () => save(area.value) }, "Save"),
+        h("button", { class: "small ghost", onclick: () => { area.value = def; save(def); } }, "Back to the studio's rules"), note));
+    return box;
+  }
 
   const main = h("div", { class: "chat" });
   const page = h("div", {}, head("Writer", "The start of a film. Tell a small story; Claude asks a few questions and writes the film: the bible (step 1), the shots in scenes (step 3) and a blockout for a scene where the camera matters (step 4). \u201cMake this film\u201d makes it. Talk about a film later to change it."),

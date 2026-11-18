@@ -115,6 +115,15 @@ class Composer(unittest.TestCase):
         self.assertEqual(c["voices"], ["sam.wav"])
         self.assertEqual([l["speaker"] for l in c["lines"]], ["Sam", "Lisa"])
 
+    def test_how_a_voice_sounds_is_said_with_each_of_its_lines(self):
+        import copy
+        film = copy.deepcopy(FILM)
+        next(c for c in film["cast"] if c["id"] == "b")["voice_words"] = "speaking in a clear, smooth voice without any rasp."
+        p = compose.compose(film, shot(cast=["a", "b"], action="They sit.", lines=[{"speaker": "a", "text": "Hi.", "how": ""},
+                                                                                    {"speaker": "b", "text": "Hello there.", "how": "warm"}]), 0)["prompt"]
+        self.assertIn("speaking in a clear, smooth voice without any rasp, warm, <d>[English] Hello there.</d>", p)
+        self.assertEqual(p.count("without any rasp"), 1)          # only Lisa's line
+
     def test_continuation_names_no_place_and_no_plate(self):
         c = compose.compose(FILM, shot(new_shot=False, location="L", cast=["a"], action="Sam opens the parcel.", frames=73), 1)
         self.assertTrue(c["continuation"])
@@ -324,6 +333,18 @@ class Blockout(unittest.TestCase):
         self.assertGreater(float(d["format"]["duration"]), 2.5)       # the sound runs on past the picture
         with self.assertRaises(Refused):
             work.blockout_source(config.out_ref(src), 100)
+
+    def test_two_scenes_blockouts_with_the_same_file_name_get_their_own_copy(self):
+        # rendered blockouts are all called blockout.mp4, each in its own folder: one shared copy gave a scene another
+        # scene's motion (and "source becomes 55 frames ... target needs 124")
+        from studio import work
+        a = media.clip(config.home("blockouts", "film_a_1", "blockout.mp4"), seconds=2.0, audio=False)
+        b = media.clip(config.home("blockouts", "film_b_1", "blockout.mp4"), seconds=4.0, audio=False)
+        out_a = work.blockout_source(config.out_ref(a), 24)
+        out_b = work.blockout_source(config.out_ref(b), 90)
+        self.assertNotEqual(out_a, out_b)
+        self.assertEqual(work.blockout_source(config.out_ref(a), 24), out_a)
+        self.assertLess(work.video_frames(out_a), work.video_frames(out_b))     # each copy is its own scene's video
 
 
 SCENE = {"sky": "night", "ground": "snow",
@@ -673,3 +694,40 @@ class Writer(unittest.TestCase):
         self.assertEqual((f["shots"][0]["action"], f["cast"][0]["description"]), ("Sam knocks twice.", "a courier in his thirties"))
         self.assertEqual((rep["updated"], rep["removed"]), ([one["id"]], [two["id"]]))
         self.assertIn(f["id"], writer.transcript(writer.load(c["id"])))                   # the film goes with the next turn
+
+    def test_the_writer_gives_props_and_a_clear_voice_and_keeps_house_rules(self):
+        from studio import writer
+        # the house rules go with every turn; the user's own replace the studio's, "" puts them back
+        self.assertIn("<SHOPPERS>", writer.system_prompt())
+        self.assertIn("without any rasp or hoarseness", writer.system_prompt())
+        try:
+            config.update({"writer": {"rules": "Every film ends at sea."}})
+            self.assertIn("Every film ends at sea.", writer.system_prompt())
+            self.assertNotIn("<SHOPPERS>", writer.system_prompt())
+        finally:
+            config.update({"writer": {"rules": ""}})
+        self.assertIn("<SHOPPERS>", writer.system_prompt())
+        for part in ("film", "edits"):
+            self.assertIn("props", writer.SCHEMA["properties"][part]["anyOf"][0]["required"])
+        c = writer.new_conversation()
+        film = {"name": "Present rain", "logline": "", "look": "cinematic",
+                "cast": [{"name": "Max", "pronoun": "his", "description": "a courier", "voice_words": "speaking in a clear voice without any rasp"}],
+                "locations": [], "props": [{"name": "the shoppers", "description": "A real photograph of six shoppers on white.", "token": "shoppers"}],
+                "shots": [{"title": "Rain", "scene": "S", "new_shot": True, "location": "", "cast": ["Max"], "framing": "", "camera": "",
+                           "action": "Presents fall. The shoppers are real people, the people from <SHOPPERS>.",
+                           "lines": [{"speaker": "Max", "text": "Look out.", "how": "calm"}], "sound": "", "seconds": 10, "prompt": ""}],
+                "blockouts": []}
+        c["turns"] += [{"role": "user", "text": "a story"}, {"role": "writer", "answer": writer.clean({"say": "", "questions": [], "film": film, "edits": None})}]
+        writer.save(c)
+        f, rep = writer.apply(c["id"], 1)
+        p = f["props"][0]
+        self.assertEqual((p["token"], p["sheet"]), ("<SHOPPERS>", ""))             # the token as the studio writes them
+        self.assertEqual(rep["props"], [p["id"]])                                   # the studio makes its picture
+        self.assertEqual(f["cast"][0]["voice_words"], "speaking in a clear voice without any rasp")
+        f["props"][0]["sheet"] = "shoppers.png"
+        out = compose.compose(f, f["shots"][0], 0)
+        self.assertIn("shoppers.png", out["refs"])
+        self.assertIn("the people from Picture 1", out["prompt"])
+        self.assertIn("speaking in a clear voice without any rasp, calm, <d>", out["prompt"])
+        words = json.loads(writer.film_words(f))
+        self.assertEqual((words["cast"][0]["voice_words"], words["props"][0]["has_picture"]), ("speaking in a clear voice without any rasp", True))

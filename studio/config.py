@@ -68,7 +68,7 @@ DEFAULTS = {
     # Measured on a 10-part film (2026-11-14): 0.9995 often dropped the blocked camera (an eye-level shot instead of a
     # high diagonal one), 0.997 follows camera, framing and positions and still looks real, 0.994 leaves the buildings
     # as flat textured blocks, 0.99 and below show the blockout with textures.
-    "blockout": {"strength": 0.997, "sampler": "er_sde", "scheduler": "beta"},
+    "blockout": {"strength": 0.997, "sampler": "res_multistep", "scheduler": "simple"},   # er_sde made voices raspy (2026-11-18)
     # a preview of a shot: rendered this small (the short side, in pixels) into a project of its own
     "preview": {"short_side": 256},
     # the Blender program that renders blockout scenes; empty = `blender` on the PATH
@@ -92,7 +92,9 @@ DEFAULTS = {
     },
     # the optional writing help. none = templates only. Rendering never uses it.
     "brain": {"kind": "none", "endpoint": "http://127.0.0.1:11434/v1", "model": "", "command": "", "timeout": 180},
-    "writer": {"command": "claude", "model": "opus"},          # the Writer: Claude Code signed in on this computer
+    # the Writer: Claude Code signed in on this computer. "rules": its house rules, added to its system prompt every
+    # time ("" = writer.DEFAULT_RULES)
+    "writer": {"command": "claude", "model": "opus", "rules": ""},
     "keep_takes": True,         # keep every take's files so an earlier take can be put back
     "finish": {"loudness": -16.0, "true_peak": -1.5, "match_clips": True, "music_gain": -18.0, "duck": 12.0},
 }

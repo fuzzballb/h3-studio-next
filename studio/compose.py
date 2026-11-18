@@ -205,6 +205,10 @@ def spoken(film, shot, voices_n, multi):
         else:
             sync = f"{poss} lips moving clearly and in sync with every word,"
         voice = f" speaking in the voice from <Audio {voices_n[nm]}>," if nm in voices_n else ""
+        # how the voice sounds, said with every line: a person LoRA can give a rasp that only words take away
+        # ("speaking in a clear, smooth, warm voice without any rasp or hoarseness", 2026-11-08)
+        sound = (c.get("voice_words") or "").strip().rstrip(",.")
+        voice += f" {sound}," if sound else ""
         how = (ln.get("how") or "").strip().rstrip(",.")
         how = f" {how}," if how else ""
         tag = f"{nm} (S{order.index(nm) + 1})"

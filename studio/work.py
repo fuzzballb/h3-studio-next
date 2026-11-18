@@ -106,6 +106,14 @@ async def image(job, ctx):
                             form={k: p[k] for k in FORM_KEYS if p.get(k) not in (None, "", [])}, surface=p.get("surface") or None)
             made.append(a)
     ctx.queue.note_time("image", len(plans), time.time() - t0)
+    if p.get("film") and p.get("prop") and made:
+        # a prop's reference picture (the Writer's props get one when they are applied): kept unless one was set meanwhile
+        with films.LOCK:
+            film = films.load(p["film"])
+            prop = next((x for x in (film or {}).get("props") or [] if x.get("id") == p["prop"]), None)
+            if prop is not None and not prop.get("sheet"):
+                prop["sheet"] = config.out_ref(library.abs_path(made[0]))
+                films.save(film)
     if p.get("film") and p.get("shot"):
         with films.LOCK:
             film = films.load(p["film"])
@@ -663,6 +671,20 @@ def video_frames(path, fps=24):
     return 0
 
 
+def _source_size(dst, size=None):
+    """The size of the file a 24 fps copy was made from (kept next to it), to see that it is still the same file."""
+    meta = dst + ".src"
+    if size is not None:
+        with open(meta, "w") as f:
+            f.write(str(size))
+        return size
+    try:
+        with open(meta) as f:
+            return int(f.read().strip())
+    except (OSError, ValueError):
+        return -1
+
+
 def blockout_source(name, need):
     """A blockout video as the V2V nodes take it: 24 fps, with a sound track a little longer than the picture (the
     V2V node stops with "source audio is N samples short" otherwise; a Blender render has no sound at all).
@@ -671,9 +693,13 @@ def blockout_source(name, need):
     src = config.ref_path(name)
     if not os.path.isfile(src):
         raise Refused(f"the blockout {name} is not there any more")
-    base = config.slug(os.path.splitext(os.path.basename(src))[0], "blockout", 60)
+    # every rendered blockout is called blockout.mp4 in a folder of its own: name the copy after the folder too, or
+    # the scenes of a film share one copy and a part reads another scene's motion
+    stem = os.path.splitext(os.path.basename(src))[0]
+    folder = os.path.basename(os.path.dirname(src))
+    base = config.slug(f"{folder}_{stem}" if folder and folder != "blockouts" else stem, "blockout", 100)
     dst = config.home("blockouts", f"{base}_24fps.mkv")
-    if not os.path.isfile(dst) or os.path.getmtime(dst) < os.path.getmtime(src):
+    if not os.path.isfile(dst) or os.path.getmtime(dst) < os.path.getmtime(src) or os.path.getsize(src) != _source_size(dst):
         probe = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", src],
                                capture_output=True, text=True)
         try:
@@ -688,6 +714,7 @@ def blockout_source(name, need):
         if r.returncode != 0:
             raise Refused(f"the blockout {name} could not be prepared: {r.stderr.strip()[-300:]}")
         os.replace(tmp, dst)
+        _source_size(dst, os.path.getsize(src))
     have = video_frames(src)
     if have and have < need:
         raise Refused(f"the blockout has {have} frames ({have / 24:.1f} s); this part reads up to frame {need}. "
